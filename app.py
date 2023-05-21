@@ -213,14 +213,44 @@ def config_down(parser: NetworkConfigParser):
         sudo_call(["ip", "link", "del", "dev", "{}0".format(parser.local_veth_prefix)])
 
 
+def load_wg_keys_from_oldconf(wg_conf_name):
+    try:
+        with open('/etc/wireguard/{}.conf'.format(wg_conf_name)) as f:
+            content = f.read()
+        content = content.split('\n')
+        for line in content:
+            if line.startswith('PrivateKey='):
+                return line.replace('PrivateKey=', '').strip()
+    except Exception:
+        logger.warn(traceback.format_exc())
+        return ''
+
+
+def import_wg_keys(parser: NetworkConfigParser, wg_conf_name):
+    private_key = load_wg_keys_from_oldconf(wg_conf_name)
+    if not private_key:
+        logger.erorr('unable to load private key from wireguard config: {}'.format(wg_conf_name))
+        return
+
+    logger.info('loading 1 private key as {}.{}'.format(parser.namespace, wg_conf_name))
+    data = {
+        'private': private_key,
+    }
+    with open('local/{}.{}.json'.format(parser.namespace, wg_conf_name), 'w') as f:
+        f.write(json.dumps(data, ensure_ascii=False))
+
+
 if __name__ == "__main__":
     action = sys.argv[1]
     conf_file = sys.argv[2]
-    
+
     config_parser = NetworkConfigParser(toml.loads(open(conf_file).read()))
     if action == 'up':
         config_up(config_parser)
     elif action == 'down':
         config_down(config_parser)
+    elif action == 'import':
+        interface_name = sys.argv[3]
+        import_wg_keys(config_parser, interface_name)
     else:
         logger.error('unknown action {}'.format(action))
