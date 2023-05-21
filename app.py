@@ -77,7 +77,7 @@ def up_wg_device(namespace, name):
 
 def patch_wg_config(namespace, name, config):
     listen_port = sudo_call_output(["ip", "netns", "exec", namespace, "wg", "show", name, "listen-port"])
-    config['listen'] = listen_port
+    config['listen'] = int(listen_port)
 
 
 def create_veth_device(namespace, name, veth_network):
@@ -145,7 +145,7 @@ def start_phantun_server(unit_prefix, install_dir, namespace, connector_config, 
     bin_path = os.path.join(install_dir, "bin", "phantun_server")
     if connector_config['remote'].startswith('dynamic#'):
         logger.info('resolving dynamic config: {}'.format(connector_config['remote']))
-        connector_config['remote'] = connector_config['remote'].format(**interface_config)
+        connector_config['remote'] = connector_config['remote'].split('#')[1].format(**interface_config)
         logger.info('resolved dynamic config: {}'.format(connector_config['remote']))
 
     try:
