@@ -2,6 +2,7 @@ import toml
 import subprocess
 import json
 import base64
+import time
 import traceback
 import sys
 import os
@@ -167,13 +168,6 @@ def config_up(parser: NetworkConfigParser):
     if parser.enable_local_network:
         create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_network)
 
-    # BIRD config
-    temp_filename = '/tmp/{}.conf'.format(uuid.uuid4())
-    with open(temp_filename, 'w') as f:
-        f.write(parser.network_bird_config)
-    
-    logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
-
     for interface_name, interface_config in parser.interfaces.items():
         create_wg_device(parser.namespace, interface_name, interface_config['address'], interface_config['mtu'])
         assign_wg_device(parser.namespace, interface_name, interface_config['private'], interface_config['listen'], interface_config['peer'], interface_config['endpoint'], interface_config['keepalive'], interface_config['allowed'])
@@ -190,6 +184,20 @@ def config_up(parser: NetworkConfigParser):
                 start_phantun_server(task_prefix, INSTALL_DIR, parser.namespace, connector_config, parser.local_ethname, interface_config)
             else:
                 logger.error('unknown connector type: {}'.format(connector_config['type']))
+
+    # BIRD config
+    temp_filename = '/tmp/{}.conf'.format(uuid.uuid4())
+    with open(temp_filename, 'w') as f:
+        f.write(parser.network_bird_config)
+    
+    logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
+    
+    # Start bird container
+    logger.info('starting router...')
+    sudo_call(["podman", "run", "--network", "ns:/var/run/netns/{}".format(parser.namespace), 
+               "--cap-add", "NET_ADMIN", "--cap-add", "SYS_ADMIN", "--cap-add", "SETPCAP", "--cap-add", "NET_RAW", "--cap-add", "NET_BROADCAST",
+               "-v", "{}:/data/bird.conf".format(temp_filename), "--name", "{}-router".format(parser.namespace),
+               "-d", "bird-router"])
 
 
 def config_down(parser: NetworkConfigParser):
@@ -211,6 +219,11 @@ def config_down(parser: NetworkConfigParser):
 
     if parser.enable_local_network:
         sudo_call(["ip", "link", "del", "dev", "{}0".format(parser.local_veth_prefix)])
+        
+    # Stop bird container
+    logger.info('stopping router...')
+    time.sleep(3)
+    sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
 
 
 def load_wg_keys_from_oldconf(wg_conf_name):
