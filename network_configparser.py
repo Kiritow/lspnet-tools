@@ -115,6 +115,7 @@ class NetworkConfigParser:
             self.enable_local_network = True
             self.local_network = local_config['address']
             self.local_ethname = local_config['ethname']
+            self.local_is_exit_node = local_config.get('exit', True)
 
             self.local_veth_prefix = local_config.get('name', '{}-veth'.format(self.namespace))
             self.local_enable_ospf = local_config.get('ospf', False)

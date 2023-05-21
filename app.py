@@ -128,6 +128,16 @@ def clear_iptables(namespace):
         logger.warning(traceback.format_exc())
 
 
+def ensure_ip_forward(namespace):
+    sudo_call(["sysctl", "-w", "net.ipv4.ip_forward=1"])
+    sudo_call(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv4.ip_forward=1"])
+
+
+def get_eth_ip(name):
+    result = json.loads(sudo_call_output(["ip", "-j", "address", "show", "dev", name]))
+    return [addr_info['local'] for addr_info in result[0]['addr_info'] if addr_info['family'] == 'inet'][0]
+
+
 def start_phantun_client(unit_prefix, install_dir, namespace, connector_config, eth_name):
     bin_path = os.path.join(install_dir, "bin", "phantun_client")
     
@@ -164,9 +174,14 @@ def start_phantun_server(unit_prefix, install_dir, namespace, connector_config, 
 def config_up(parser: NetworkConfigParser):
     ensure_netns(parser.namespace)
     ensure_iptables(parser.namespace)
+    ensure_ip_forward(parser.namespace)
 
     if parser.enable_local_network:
         create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_network)
+        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_network, "-o", "{}0".format(parser.local_veth_prefix) , "-j", "SNAT", "--to", get_eth_ip(parser.local_ethname)])
+
+        if parser.local_is_exit_node:
+            sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_ethname, "-j", "MASQUERADE"])
 
     for interface_name, interface_config in parser.interfaces.items():
         create_wg_device(parser.namespace, interface_name, interface_config['address'], interface_config['mtu'])
