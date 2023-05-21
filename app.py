@@ -137,7 +137,7 @@ def start_phantun_client(unit_prefix, install_dir, namespace, connector_config, 
         logger.info('iptables rule not exist, try to insert one...')
         sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name])
 
-    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", 
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", "-E", "RUST_LOG=debug",
                bin_path, "--local", str(connector_config['local']), "--remote", str(connector_config['remote']), "--tun", connector_config['tun-name'], "--tun-local", connector_config['tun-local'], "--tun-peer", connector_config['tun-peer']])
 
 
@@ -156,7 +156,7 @@ def start_phantun_server(unit_prefix, install_dir, namespace, connector_config, 
         sudo_call(["iptables", "-t", "nat", "-I", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_config['local']), "-j", "DNAT", "--to-destination", connector_config['tun-peer']])
 
 
-    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", "-E", "RUST_LOG=debug",
                bin_path, "--local", str(connector_config['local']), "--remote", str(connector_config['remote']), "--tun", connector_config['tun-name'], "--tun-local", connector_config['tun-local'], "--tun-peer", connector_config['tun-peer']])
 
 
