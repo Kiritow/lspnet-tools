@@ -1,0 +1,4 @@
+*.toml
+
+__pycache__/
+local/
