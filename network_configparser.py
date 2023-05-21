@@ -119,6 +119,10 @@ class NetworkConfigParser:
             self.local_veth_prefix = local_config.get('name', '{}-veth'.format(self.namespace))
             self.local_enable_ospf = local_config.get('ospf', False)
             self.local_ospf_area = local_config.get('area', 0)
+            self.local_ospf_cost = network_config.get('cost', 0)
+
+            # Validation
+            valid_must_network = ipaddress.ip_network(local_config['address'])
 
         network_config = config['config']
         self.network_default_enable_ospf = network_config.get('ospf', False)
@@ -187,6 +191,9 @@ class NetworkConfigParser:
 
         # BIRD config
         interface_cidrs = [str(ipaddress.ip_interface(interface_config['address']).network) for interface_name, interface_config in self.interfaces.items() if interface_config['ospf']]
+        if self.enable_local_network and self.local_enable_ospf:
+            interface_cidrs.append(str(ipaddress.ip_network(self.local_network)))
+
         interface_ospf_info = {}
         for interface_name, interface_config in self.interfaces.items():
             if not interface_config['ospf']:
@@ -199,6 +206,15 @@ class NetworkConfigParser:
             
             interface_ospf_info[interface_config['ospf_area']]["interfaces"][interface_name] = {
                 'cost': interface_config['ospf_cost'],
+            }
+        
+        if self.enable_local_network and self.local_enable_ospf:
+            if self.local_ospf_area not in interface_ospf_info:
+                interface_ospf_info[self.local_ospf_area] = {
+                    "interfaces": {},
+                }
+            interface_ospf_info[self.local_ospf_area]['interfaces']["{}1".format(self.local_veth_prefix)] = {
+                'cost': self.local_ospf_cost,
             }
 
         self.network_bird_config = get_bird_config('', [], interface_cidrs, interface_ospf_info)
