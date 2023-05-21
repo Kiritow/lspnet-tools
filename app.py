@@ -139,7 +139,7 @@ def start_phantun_client(unit_prefix, install_dir, namespace, connector_config, 
 
 
 def start_phantun_server(unit_prefix, install_dir, namespace, connector_config, eth_name, interface_config):
-    bin_path = os.path.join(install_dir, "bin", "phantun_client")
+    bin_path = os.path.join(install_dir, "bin", "phantun_server")
     if connector_config['remote'].startswith('dynamic#'):
         logger.info('resolving dynamic config: {}'.format(connector_config['remote']))
         connector_config['remote'] = connector_config['remote'].format(**interface_config)
