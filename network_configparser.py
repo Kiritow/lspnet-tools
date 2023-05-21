@@ -119,7 +119,7 @@ class NetworkConfigParser:
             self.local_veth_prefix = local_config.get('name', '{}-veth'.format(self.namespace))
             self.local_enable_ospf = local_config.get('ospf', False)
             self.local_ospf_area = local_config.get('area', 0)
-            self.local_ospf_cost = network_config.get('cost', 0)
+            self.local_ospf_cost = local_config.get('cost', 0)
 
             # Validation
             valid_must_network = ipaddress.ip_network(local_config['address'])
