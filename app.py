@@ -189,13 +189,13 @@ def config_up(parser: NetworkConfigParser):
 
 def config_down(parser: NetworkConfigParser):
     ensure_netns(parser.namespace)
-    
-    clear_iptables(parser.namespace)
-    
+        
     # stop all tasks
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
     sudo_call(["systemctl", "stop", "{}-*.timer".format(task_prefix)])
     sudo_call(["systemctl", "stop", "{}-*.service".format(task_prefix)])
+
+    clear_iptables(parser.namespace)
 
     for interface_name in parser.interfaces:
         result = json.loads(sudo_call_output(["ip", "-j", "-n", parser.namespace, "link"]))
