@@ -105,12 +105,14 @@ def ensure_iptables(namespace):
         sudo_call(["iptables", "-t", "nat", "-I", "POSTROUTING", "-j", "{}-POSTROUTING".format(namespace)])
     except Exception:
         logger.warning(traceback.format_exc())
-    
+        logger.info('iptables chain exists, skip creation.')
+
     try:
         sudo_call(["iptables", "-t", "nat", "-N", "{}-PREROUTING".format(namespace)])
         sudo_call(["iptables", "-t", "nat", "-I", "PREROUTING", "-j", "{}-PREROUTING".format(namespace)])
     except Exception:
         logger.warning(traceback.format_exc())
+        logger.info('iptables chain exists, skip creation.')
 
 
 def clear_iptables(namespace):
@@ -130,9 +132,10 @@ def start_phantun_client(unit_prefix, install_dir, namespace, connector_config, 
     
     try:
         sudo_call(["iptables", "-t", "nat", "-C", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name])
-        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name])
     except Exception:
         logger.warning(traceback.format_exc())
+        logger.info('iptables rule not exist, try to insert one...')
+        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name])
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", 
                bin_path, "--local", str(connector_config['local']), "--remote", str(connector_config['remote']), "--tun", connector_config['tun-name'], "--tun-local", connector_config['tun-local'], "--tun-peer", connector_config['tun-peer']])
@@ -147,9 +150,11 @@ def start_phantun_server(unit_prefix, install_dir, namespace, connector_config, 
 
     try:
         sudo_call(["iptables", "-t", "nat", "-C", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_config['local']), "-j", "DNAT", "--to-destination", connector_config['tun-peer']])
-        sudo_call(["iptables", "-t", "nat", "-I", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_config['local']), "-j", "DNAT", "--to-destination", connector_config['tun-peer']])
     except Exception:
         logger.warning(traceback.format_exc())
+        logger.info('iptables rule not exist, try to insert one...')
+        sudo_call(["iptables", "-t", "nat", "-I", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_config['local']), "-j", "DNAT", "--to-destination", connector_config['tun-peer']])
+
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
                bin_path, "--local", str(connector_config['local']), "--remote", str(connector_config['remote']), "--tun", connector_config['tun-name'], "--tun-local", connector_config['tun-local'], "--tun-peer", connector_config['tun-peer']])
