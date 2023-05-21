@@ -215,8 +215,7 @@ def config_down(parser: NetworkConfigParser):
 
 def load_wg_keys_from_oldconf(wg_conf_name):
     try:
-        with open('/etc/wireguard/{}.conf'.format(wg_conf_name)) as f:
-            content = f.read()
+        content = sudo_call_output(["cat", '/etc/wireguard/{}.conf'.format(wg_conf_name)])
         content = content.split('\n')
         for line in content:
             if line.startswith('PrivateKey='):
