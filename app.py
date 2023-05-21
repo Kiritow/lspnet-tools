@@ -142,11 +142,11 @@ def start_phantun_client(unit_prefix, install_dir, namespace, connector_config, 
     bin_path = os.path.join(install_dir, "bin", "phantun_client")
     
     try:
-        sudo_call(["iptables", "-t", "nat", "-C", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name])
+        sudo_call(["iptables", "-t", "nat", "-C", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name, "-j", "MASQUERADE"])
     except Exception:
         logger.warning(traceback.format_exc())
         logger.info('iptables rule not exist, try to insert one...')
-        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name])
+        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name, "-j", "MASQUERADE"])
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", "-E", "RUST_LOG=debug",
                bin_path, "--local", str(connector_config['local']), "--remote", str(connector_config['remote']), "--tun", connector_config['tun-name'], "--tun-local", connector_config['tun-local'], "--tun-peer", connector_config['tun-peer']])
