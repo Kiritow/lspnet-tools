@@ -114,8 +114,11 @@ class NetworkConfigParser:
         else:
             self.enable_local_network = True
             self.local_network = local_config['address']
+            self.local_ethname = local_config['ethname']
+
             self.local_veth_prefix = local_config.get('name', '{}-veth'.format(self.namespace))
             self.local_enable_ospf = local_config.get('ospf', False)
+            self.local_ospf_area = local_config.get('area', 0)
 
         network_config = config['config']
         self.network_default_enable_ospf = network_config.get('ospf', False)
@@ -160,11 +163,13 @@ class NetworkConfigParser:
                         new_connector['remote'] = 'dynamic#127.0.0.1:{listen}'
                     else:
                         new_connector['remote'] = '127.0.0.1:{}'.format(new_interface['listen'])
+                    new_connector['tun-name'] = connector_config['tun-name']
                     new_connector['tun-local'] = connector_config['tun-local']
                     new_connector['tun-peer'] = connector_config['tun-peer']
                 elif new_connector['type'] == 'phantun-client':
                     new_connector['local'] = '127.0.0.1:{}'.format(connector_config['listen'])
                     new_connector['remote'] = connector_config['remote']
+                    new_connector['tun-name'] = connector_config['tun-name']
                     new_connector['tun-local'] = connector_config['tun-local']
                     new_connector['tun-peer'] = connector_config['tun-peer']
 
