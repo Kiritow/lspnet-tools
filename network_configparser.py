@@ -33,13 +33,21 @@ def load_or_create_keys(namespace, name):
         return data
 
 
-def get_bird_config(router_id, direct_interface_names, ospf_exclude_cidrs, ospf_areas):
+def get_bird_config(router_id, direct_interface_names, ospf_exclude_import_cidrs, ospf_exclude_export_cidrs, ospf_areas):
     current_time_text = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     router_id_text = 'router id {};'.format(router_id) if router_id else ''
     dnames_text = '\n'.join(['interface "{}";'.format(name) for name in direct_interface_names])
-    filter_expression = ' && '.join(['net !~ {}'.format(ip_cidr) for ip_cidr in ospf_exclude_cidrs])
-    filter_statement_text = 'if ({}) then accept;\nelse reject;'.format(filter_expression)
-    
+    import_filter_expression = ' && '.join(['net !~ {}'.format(ip_cidr) for ip_cidr in ospf_exclude_import_cidrs])
+    if import_filter_expression:
+        import_filter_statement_text = 'import filter {{\nif ({}) then accept;\nelse reject;\n}}'.format(import_filter_expression)
+    else:
+        import_filter_statement_text = 'import all'
+    export_filter_expression = ' && '.join(['net !~ {}'.format(ip_cidr) for ip_cidr in ospf_exclude_export_cidrs])
+    if export_filter_expression:
+        export_filter_statement_text = 'export filter {{\nif ({}) then accept;\nelse reject;\n}}'.format(export_filter_expression)
+    else:
+        export_filter_statement_text = 'export all'
+
     all_area_configs = []
     for area_id, area_config in ospf_areas.items():
         new_area = {}
@@ -90,10 +98,8 @@ protocol ospf v2 wg {{
     ecmp yes;
     merge external yes;
     ipv4 {{
-        import filter {{
-            {filter_statement_text}
-        }};
-        export all;
+        {import_filter_statement_text};
+        {export_filter_statement_text};
     }};
     {final_area_text}
 }}
@@ -218,4 +224,4 @@ class NetworkConfigParser:
                 'cost': self.local_ospf_cost,
             }
 
-        self.network_bird_config = get_bird_config('', [], interface_cidrs, interface_ospf_info)
+        self.network_bird_config = get_bird_config('', [], interface_cidrs, interface_cidrs, interface_ospf_info)
