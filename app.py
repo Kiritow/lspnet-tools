@@ -178,8 +178,8 @@ def config_up(parser: NetworkConfigParser):
 
     if parser.enable_local_network:
         create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_network)
-        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_network, "-d", parser.local_network, "-j", "ACCEPT"])
         sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_network, "!", "-d", "224.0.0.0/4", "-j", "SNAT", "--to", get_eth_ip(parser.local_ethname)])
+        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_network, "-d", parser.local_network, "-j", "ACCEPT"])
 
         if parser.local_is_exit_node:
             sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_ethname, "-j", "MASQUERADE"])
