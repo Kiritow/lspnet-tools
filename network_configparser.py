@@ -244,8 +244,8 @@ class NetworkConfigParser:
 
         if self.enable_local_network and self.local_interface.enable_ospf:
             if self.local_interface.ospf_config.area not in ospf_area_config:
-                ospf_area_config[interface_item.ospf_config.area] = {}
+                ospf_area_config[self.local_interface.ospf_config.area] = {}
 
-            ospf_area_config[interface_item.ospf_config.area]["{}1".format(self.local_veth_prefix)] = self.local_interface.ospf_config
+            ospf_area_config[self.local_interface.ospf_config.area]["{}1".format(self.local_veth_prefix)] = self.local_interface.ospf_config
 
         self.network_bird_config = get_bird_config('', [], interface_cidrs, [], ospf_area_config)
