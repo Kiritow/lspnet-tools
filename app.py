@@ -152,6 +152,11 @@ def clear_iptables(namespace):
     except Exception:
         logger.warning(traceback.format_exc())
 
+    try:
+        sudo_call(["ip", "netns", "exec", namespace, "iptables", "-F", "FORWARD"])
+    except Exception:
+        logger.warning(traceback.format_exc())
+
 
 def ensure_ip_forward(namespace):
     sudo_call(["sysctl", "-w", "net.ipv4.ip_forward=1"])
@@ -242,6 +247,9 @@ def config_up(parser: NetworkConfigParser):
 
         if parser.local_is_exit_node:
             sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_interface.name, "-j", "MASQUERADE"])
+
+    # PMTU fix
+    sudo_call(["ip", "netns", "exec", parser.namespace, "iptables", "-A", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "RST", "-j", "TCPMSS", "--clamp-mss-to-pmtu"])
 
     for interface_name, interface_item in parser.interfaces.items():
         create_wg_device(parser.namespace, interface_name, interface_item.address, interface_item.mtu)
