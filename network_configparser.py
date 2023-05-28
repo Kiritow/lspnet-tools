@@ -67,8 +67,6 @@ else reject;
             if ospf_interface_config.auth:
                 text_parts.append("authentication cryptographic;")
                 text_parts.append(f'''password "{ospf_interface_config}" {{
-generate to "31-12-2099 23:59:59";
-accept from {current_time_for_auth_text}
 algorithm hmac sha512;
 }};''')
             text_parts.append('};')
