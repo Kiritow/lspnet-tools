@@ -249,7 +249,7 @@ def config_up(parser: NetworkConfigParser):
             sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_interface.name, "-j", "MASQUERADE"])
 
     # PMTU fix
-    sudo_call(["ip", "netns", "exec", parser.namespace, "iptables", "-A", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "RST", "-j", "TCPMSS", "--clamp-mss-to-pmtu"])
+    sudo_call(["ip", "netns", "exec", parser.namespace, "iptables", "-A", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"])
 
     for interface_name, interface_item in parser.interfaces.items():
         create_wg_device(parser.namespace, interface_name, interface_item.address, interface_item.mtu)
