@@ -1,7 +1,6 @@
 import toml
 import subprocess
 import json
-import base64
 import time
 import traceback
 import sys
@@ -54,7 +53,7 @@ def create_wg_device(namespace, name, address, mtu):
 def assign_wg_device(namespace, name, private_key, listen_port, peer, endpoint, keepalive, allowed_ips):
     config_items = []
 
-    temp_filename = '/tmp/{}.conf'.format(uuid.uuid4())
+    temp_filename = '/tmp/{}-{}.conf'.format(namespace, uuid.uuid4())
     with open(temp_filename, 'w') as f:
         f.write(private_key)
 
@@ -201,7 +200,7 @@ def config_up(parser: NetworkConfigParser):
                 logger.error('unknown connector item: {}'.format(connector_item))
 
     # BIRD config
-    temp_filename = '/tmp/{}.conf'.format(uuid.uuid4())
+    temp_filename = '/tmp/{}-{}.conf'.format(parser.namespace, uuid.uuid4())
     with open(temp_filename, 'w') as f:
         f.write(parser.network_bird_config)
 
@@ -211,7 +210,7 @@ def config_up(parser: NetworkConfigParser):
     logger.info('starting router...')
     sudo_call(["podman", "run", "--network", "ns:/var/run/netns/{}".format(parser.namespace), 
                "--cap-add", "NET_ADMIN", "--cap-add", "CAP_NET_BIND_SERVICE", "--cap-add", "NET_RAW", "--cap-add", "NET_BROADCAST",
-               "-v", "{}:/data/bird.conf".format(temp_filename), "--name", "{}-router".format(parser.namespace),
+               "-v", "{}:/data/bird.conf:ro".format(temp_filename), "--name", "{}-router".format(parser.namespace),
                "-d", "bird-router"])
 
 
@@ -234,6 +233,11 @@ def config_down(parser: NetworkConfigParser):
 
     if parser.enable_local_network:
         sudo_call(["ip", "link", "del", "dev", "{}0".format(parser.local_veth_prefix)])
+
+    sudo_call(["podman", "container", "exists", "{}-router".format(parser.namespace)])
+    container_inspect_result = json.loads(sudo_call_output(["podman", "container", "inspect", "{}-router".format(parser.namespace)]))
+    temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result[0]["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(parser.namespace))][0]
+    logger.warn('leaving temp file: {}'.format(temp_filepath))
 
     # Stop bird container
     logger.info('stopping router... (wait 3s for ospf)')
