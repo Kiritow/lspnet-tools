@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import ipaddress
 from typing import Dict
 
-from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig
+from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig
 from get_logger import get_logger
 
 logger = get_logger('app')
@@ -136,6 +136,11 @@ class NetworkConfigParser:
                     local_config.get('cost', 0),
                     local_config.get('auth', ''),
                     'ptp')
+            local_mapping_config = local_config.get('mapping', [])
+            self.local_network_mapping = [
+                NetworkMappingConfig(data['from'], data['to'], data['num'], data.get('size', 1024))
+                for data in local_mapping_config
+            ]
 
         network_config = root_config['config']
         self.network_default_enable_ospf = network_config.get('ospf', False)

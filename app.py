@@ -8,7 +8,7 @@ import os
 import ipaddress
 import uuid
 from network_configparser import NetworkConfigParser
-from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig
+from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig
 from get_logger import get_logger
 
 
@@ -116,6 +116,20 @@ def ensure_iptables(namespace):
         logger.warning(traceback.format_exc())
         logger.info('iptables chain exists, skip creation.')
 
+    try:
+        sudo_call(["iptables", "-t", "raw", "-N", "{}-PREROUTING".format(namespace)])
+        sudo_call(["iptables", "-t", "raw", "-I", "PREROUTING", "-j", "{}-PREROUTING".format(namespace)])
+    except Exception:
+        logger.warning(traceback.format_exc())
+        logger.info('iptables chain exists, skip creation.')
+
+    try:
+        sudo_call(["iptables", "-t", "mangle", "-N", "{}-POSTROUTING".format(namespace)])
+        sudo_call(["iptables", "-t", "mangle", "-I", "POSTROUTING", "-j", "{}-POSTROUTING".format(namespace)])
+    except Exception:
+        logger.warning(traceback.format_exc())
+        logger.info('iptables chain exists, skip creation.')
+
 
 def clear_iptables(namespace):
     try:
@@ -125,6 +139,16 @@ def clear_iptables(namespace):
     
     try:
         sudo_call(["iptables", "-t", "nat", "-F", "{}-PREROUTING".format(namespace)])
+    except Exception:
+        logger.warning(traceback.format_exc())
+    
+    try:
+        sudo_call(["iptables", "-t", "raw", "-F", "{}-PREROUTING".format(namespace)])
+    except Exception:
+        logger.warning(traceback.format_exc())
+    
+    try:
+        sudo_call(["iptables", "-t", "mangle", "-F", "{}-POSTROUTING".format(namespace)])
     except Exception:
         logger.warning(traceback.format_exc())
 
@@ -156,23 +180,60 @@ def start_phantun_client(unit_prefix, install_dir, namespace, connector_item: Co
 def start_phantun_server(unit_prefix, install_dir, namespace, connector_item: ConnectorPhantunServerConfig, eth_name, interface_item: InterfaceConfig):
     bin_path = os.path.join(install_dir, "bin", "phantun_server")
     connector_item.dynamic_inject(interface_item)
+    
+    call_args = ["iptables", "-t", "nat", "-C", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_item.local), "-j", "DNAT", "--to-destination", connector_item.tun_peer]
 
     try:
-        sudo_call(["iptables", "-t", "nat", "-C", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_item.local), "-j", "DNAT", "--to-destination", connector_item.tun_peer])
+        sudo_call(call_args)
     except Exception:
         logger.warning(traceback.format_exc())
         logger.info('iptables rule not exist, try to insert one...')
-        sudo_call(["iptables", "-t", "nat", "-A", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_item.local), "-j", "DNAT", "--to-destination", connector_item.tun_peer])
-
+        call_args[3] = '-A'
+        sudo_call(call_args)
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", "-E", "RUST_LOG=debug",
                bin_path, "--local", str(connector_item.local), "--remote", str(connector_item.remote), "--tun", connector_item.tun_name, "--tun-local", connector_item.tun_local, "--tun-peer", connector_item.tun_peer])
+
+
+def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkMappingConfig, eth_name):
+    bin_path = os.path.join(install_dir, "bin", "nfq-worker")
+
+    # EGRESS
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
+               bin_path, "--mode", "1", "--num", str(config_item.queue_number), "--len", str(config_item.queue_size), "--from", config_item.from_addr, "--to", config_item.to_addr])
+
+    # INGRESS
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
+               bin_path, "--mode", "2", "--num", str(config_item.queue_number + 1), "--len", str(config_item.queue_size), "--from", config_item.to_addr, "--to", config_item.from_addr])
+
+
+    # EGRESS
+    call_args1 = ["iptables", "-t", "mangle", "-C", "{}-POSTROUTING".format(namespace), "-o", eth_name, "-d", config_item.from_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number)]
+    try:
+        sudo_call(call_args1)
+    except Exception:
+        logger.warning(traceback.format_exc())
+        logger.info('iptables rule not exist, try to insert one...')
+        call_args1[3] = '-A'
+        sudo_call(call_args1)
+
+    # INGRESS
+    call_args2 = ["iptables", "-t", "raw", "-C", "{}-PREROUTING".format(namespace), "-i", eth_name, "-s", config_item.to_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number + 1)]
+    try:
+        sudo_call(call_args2)
+    except Exception:
+        logger.warning(traceback.format_exc())
+        logger.info('iptables rule not exist, try to insert one...')
+        call_args2[3] = '-A'
+        sudo_call(call_args2)
 
 
 def config_up(parser: NetworkConfigParser):
     ensure_netns(parser.namespace)
     ensure_iptables(parser.namespace)
     ensure_ip_forward(parser.namespace)
+    
+    task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
 
     if parser.enable_local_network:
         create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_interface.address)
@@ -189,13 +250,17 @@ def config_up(parser: NetworkConfigParser):
         patch_wg_config(parser.namespace, interface_name, interface_item)
 
         # Connector
-        task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
         if interface_item.connector:
             connector_item = interface_item.connector
             if isinstance(connector_item, ConnectorPhantunClientConfig):
                 start_phantun_client(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name)
             elif isinstance(connector_item, ConnectorPhantunServerConfig):
                 start_phantun_server(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name, interface_item)
+
+    # Network mapping
+    if parser.local_network_mapping:
+        for mapping_config_item in parser.local_network_mapping:
+            start_nfq_workers(task_prefix, INSTALL_DIR, parser.namespace, mapping_config_item, parser.local_interface.name)
 
     # BIRD config
     temp_filename = '/tmp/{}-{}.conf'.format(parser.namespace, uuid.uuid4())

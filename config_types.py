@@ -38,6 +38,14 @@ class ConnectorPhantunServerConfig:
 
 
 @dataclass
+class NetworkMappingConfig:
+    from_addr: str
+    to_addr: str
+    queue_number: int
+    queue_size: int
+
+
+@dataclass
 class InterfaceConfig:
     name: str = ''
     private: str = ''
