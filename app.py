@@ -196,8 +196,6 @@ def config_up(parser: NetworkConfigParser):
                 start_phantun_client(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name)
             elif isinstance(connector_item, ConnectorPhantunServerConfig):
                 start_phantun_server(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name, interface_item)
-            else:
-                logger.error('unknown connector item: {}'.format(connector_item))
 
     # BIRD config
     temp_filename = '/tmp/{}-{}.conf'.format(parser.namespace, uuid.uuid4())
