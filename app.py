@@ -213,6 +213,8 @@ def config_up(parser: NetworkConfigParser):
                "-v", "{}:/data/bird.conf:ro".format(temp_filename), "--name", "{}-router".format(parser.namespace),
                "-d", "bird-router"])
 
+    logger.info('network is up.')
+
 
 def config_down(parser: NetworkConfigParser):
     ensure_netns(parser.namespace)
@@ -237,12 +239,16 @@ def config_down(parser: NetworkConfigParser):
     sudo_call(["podman", "container", "exists", "{}-router".format(parser.namespace)])
     container_inspect_result = json.loads(sudo_call_output(["podman", "container", "inspect", "{}-router".format(parser.namespace)]))
     temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result[0]["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(parser.namespace))][0]
-    logger.warn('leaving temp file: {}'.format(temp_filepath))
 
     # Stop bird container
     logger.info('stopping router... (wait 3s for ospf)')
     time.sleep(3)
     sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
+    
+    logger.info('removing temp file: {}'.format(temp_filepath))
+    os.unlink(temp_filepath)
+    
+    logger.info('network is down.')
 
 
 def load_wg_keys_from_oldconf(wg_conf_name):
