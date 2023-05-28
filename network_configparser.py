@@ -66,7 +66,7 @@ else reject;
                 text_parts.append("type {};".format(ospf_interface_config.type))
             if ospf_interface_config.auth:
                 text_parts.append("authentication cryptographic;")
-                text_parts.append(f'''password "{ospf_interface_config}" {{
+                text_parts.append(f'''password "{ospf_interface_config.auth}" {{
 algorithm hmac sha512;
 }};''')
             text_parts.append('};')
