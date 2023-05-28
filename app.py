@@ -9,7 +9,9 @@ import os
 import ipaddress
 import uuid
 from network_configparser import NetworkConfigParser
+from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig
 from get_logger import get_logger
+
 
 logger = get_logger('app')
 INSTALL_DIR = os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -76,9 +78,9 @@ def up_wg_device(namespace, name):
     sudo_call(["ip", "-n", namespace, "link", "set", "dev", name, "up"])
 
 
-def patch_wg_config(namespace, name, config):
+def patch_wg_config(namespace, name, interface_item: InterfaceConfig):
     listen_port = sudo_call_output(["ip", "netns", "exec", namespace, "wg", "show", name, "listen-port"])
-    config['listen'] = int(listen_port)
+    interface_item.listen = int(listen_port)
 
 
 def create_veth_device(namespace, name, veth_network):
@@ -138,37 +140,34 @@ def get_eth_ip(name):
     return [addr_info['local'] for addr_info in result[0]['addr_info'] if addr_info['family'] == 'inet'][0]
 
 
-def start_phantun_client(unit_prefix, install_dir, namespace, connector_config, eth_name):
+def start_phantun_client(unit_prefix, install_dir, namespace, connector_item: ConnectorPhantunClientConfig, eth_name):
     bin_path = os.path.join(install_dir, "bin", "phantun_client")
     
     try:
-        sudo_call(["iptables", "-t", "nat", "-C", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name, "-j", "MASQUERADE"])
+        sudo_call(["iptables", "-t", "nat", "-C", "{}-POSTROUTING".format(namespace), "-s", connector_item.tun_peer, "-o", eth_name, "-j", "MASQUERADE"])
     except Exception:
         logger.warning(traceback.format_exc())
         logger.info('iptables rule not exist, try to insert one...')
-        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(namespace), "-s", connector_config['tun-peer'], "-o", eth_name, "-j", "MASQUERADE"])
+        sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(namespace), "-s", connector_item.tun_peer, "-o", eth_name, "-j", "MASQUERADE"])
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", "-E", "RUST_LOG=debug",
-               bin_path, "--local", str(connector_config['local']), "--remote", str(connector_config['remote']), "--tun", connector_config['tun-name'], "--tun-local", connector_config['tun-local'], "--tun-peer", connector_config['tun-peer']])
+               bin_path, "--local", str(connector_item.local), "--remote", str(connector_item.remote), "--tun", connector_item.tun_name, "--tun-local", connector_item.tun_local, "--tun-peer", connector_item.tun_peer])
 
 
-def start_phantun_server(unit_prefix, install_dir, namespace, connector_config, eth_name, interface_config):
+def start_phantun_server(unit_prefix, install_dir, namespace, connector_item: ConnectorPhantunServerConfig, eth_name, interface_item: InterfaceConfig):
     bin_path = os.path.join(install_dir, "bin", "phantun_server")
-    if connector_config['remote'].startswith('dynamic#'):
-        logger.info('resolving dynamic config: {}'.format(connector_config['remote']))
-        connector_config['remote'] = connector_config['remote'].split('#')[1].format(**interface_config)
-        logger.info('resolved dynamic config: {}'.format(connector_config['remote']))
+    connector_item.dynamic_inject(interface_item)
 
     try:
-        sudo_call(["iptables", "-t", "nat", "-C", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_config['local']), "-j", "DNAT", "--to-destination", connector_config['tun-peer']])
+        sudo_call(["iptables", "-t", "nat", "-C", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_item.local), "-j", "DNAT", "--to-destination", connector_item.tun_peer])
     except Exception:
         logger.warning(traceback.format_exc())
         logger.info('iptables rule not exist, try to insert one...')
-        sudo_call(["iptables", "-t", "nat", "-I", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_config['local']), "-j", "DNAT", "--to-destination", connector_config['tun-peer']])
+        sudo_call(["iptables", "-t", "nat", "-A", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_item.local), "-j", "DNAT", "--to-destination", connector_item.tun_peer])
 
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", "-E", "RUST_LOG=debug",
-               bin_path, "--local", str(connector_config['local']), "--remote", str(connector_config['remote']), "--tun", connector_config['tun-name'], "--tun-local", connector_config['tun-local'], "--tun-peer", connector_config['tun-peer']])
+               bin_path, "--local", str(connector_item.local), "--remote", str(connector_item.remote), "--tun", connector_item.tun_name, "--tun-local", connector_item.tun_local, "--tun-peer", connector_item.tun_peer])
 
 
 def config_up(parser: NetworkConfigParser):
@@ -177,41 +176,41 @@ def config_up(parser: NetworkConfigParser):
     ensure_ip_forward(parser.namespace)
 
     if parser.enable_local_network:
-        create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_network)
-        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_network, "!", "-d", "224.0.0.0/4", "-j", "SNAT", "--to", get_eth_ip(parser.local_ethname)])
-        sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_network, "-d", parser.local_network, "-j", "ACCEPT"])
+        create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_interface.address)
+        sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_interface.address, "-d", parser.local_interface.address, "-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
+        sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_interface.address, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
 
         if parser.local_is_exit_node:
-            sudo_call(["iptables", "-t", "nat", "-I", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_ethname, "-j", "MASQUERADE"])
+            sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_interface.name, "-j", "MASQUERADE"])
 
-    for interface_name, interface_config in parser.interfaces.items():
-        create_wg_device(parser.namespace, interface_name, interface_config['address'], interface_config['mtu'])
-        assign_wg_device(parser.namespace, interface_name, interface_config['private'], interface_config['listen'], interface_config['peer'], interface_config['endpoint'], interface_config['keepalive'], interface_config['allowed'])
+    for interface_name, interface_item in parser.interfaces.items():
+        create_wg_device(parser.namespace, interface_name, interface_item.address, interface_item.mtu)
+        assign_wg_device(parser.namespace, interface_name, interface_item.private, interface_item.listen, interface_item.peer, interface_item.endpoint, interface_item.keepalive, interface_item.allowed)
         up_wg_device(parser.namespace, interface_name)
-        patch_wg_config(parser.namespace,interface_name, interface_config)
+        patch_wg_config(parser.namespace, interface_name, interface_item)
 
         # Connector
         task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
-        if interface_config['connector']:
-            connector_config = interface_config['connector']
-            if connector_config['type'] == 'phantun-client':
-                start_phantun_client(task_prefix, INSTALL_DIR, parser.namespace, connector_config, parser.local_ethname)
-            elif connector_config['type'] == 'phantun-server':
-                start_phantun_server(task_prefix, INSTALL_DIR, parser.namespace, connector_config, parser.local_ethname, interface_config)
+        if interface_item.connector:
+            connector_item = interface_item.connector
+            if isinstance(connector_item, ConnectorPhantunClientConfig):
+                start_phantun_client(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name)
+            elif isinstance(connector_item, ConnectorPhantunServerConfig):
+                start_phantun_server(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name, interface_item)
             else:
-                logger.error('unknown connector type: {}'.format(connector_config['type']))
+                logger.error('unknown connector item: {}'.format(connector_item))
 
     # BIRD config
     temp_filename = '/tmp/{}.conf'.format(uuid.uuid4())
     with open(temp_filename, 'w') as f:
         f.write(parser.network_bird_config)
-    
+
     logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
-    
+
     # Start bird container
     logger.info('starting router...')
     sudo_call(["podman", "run", "--network", "ns:/var/run/netns/{}".format(parser.namespace), 
-               "--cap-add", "NET_ADMIN", "--cap-add", "SYS_ADMIN", "--cap-add", "SETPCAP", "--cap-add", "NET_RAW", "--cap-add", "NET_BROADCAST",
+               "--cap-add", "NET_ADMIN", "--cap-add", "CAP_NET_BIND_SERVICE", "--cap-add", "NET_RAW", "--cap-add", "NET_BROADCAST",
                "-v", "{}:/data/bird.conf".format(temp_filename), "--name", "{}-router".format(parser.namespace),
                "-d", "bird-router"])
 
@@ -235,9 +234,9 @@ def config_down(parser: NetworkConfigParser):
 
     if parser.enable_local_network:
         sudo_call(["ip", "link", "del", "dev", "{}0".format(parser.local_veth_prefix)])
-        
+
     # Stop bird container
-    logger.info('stopping router...')
+    logger.info('stopping router... (wait 3s for ospf)')
     time.sleep(3)
     sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
 
