@@ -84,7 +84,7 @@ algorithm hmac sha512;
 
 log stderr all;
 {router_id_text}
-debug protocols all;
+#debug protocols all;
 protocol device {{
     
 }}
