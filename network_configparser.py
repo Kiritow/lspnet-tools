@@ -45,14 +45,14 @@ def get_bird_config(router_id, direct_interface_names, ospf_exclude_import_cidrs
     dnames_text = '\n'.join(['interface "{}";'.format(name) for name in direct_interface_names])
     localnet_no_import_variable_text = 'define LOCALNET_NO_IMPORTSET=[{}];'.format(','.join(ospf_exclude_import_cidrs)) if ospf_exclude_import_cidrs else ''
     localnet_no_export_variable_text = 'define LOCALNET_NO_EXPORTSET=[{}];'.format(','.join(ospf_exclude_export_cidrs)) if ospf_exclude_export_cidrs else ''
-    import_filter_text = '''import filter {{
+    import_filter_text = '''import filter {
 if net !~ LOCALNET_NO_IMPORTSET then accept;
 else reject;
-}}''' if localnet_no_import_variable_text else 'import all'
-    export_filter_text = '''export filter {{
+}''' if localnet_no_import_variable_text else 'import all'
+    export_filter_text = '''export filter {
 if net !~ LOCALNET_NO_EXPORTSET then accept;
 else reject;
-}}''' if localnet_no_export_variable_text else 'export all'
+}''' if localnet_no_export_variable_text else 'export all'
 
     all_area_texts = []
     for area_id, area_interface_mapping in ospf_area_config.items():
@@ -86,6 +86,7 @@ algorithm hmac sha512;
 
 log stderr all;
 {router_id_text}
+debug protocols all;
 protocol device {{
     
 }}
