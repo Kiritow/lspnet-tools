@@ -356,7 +356,7 @@ def config_down(parser: NetworkConfigParser):
     sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
     
     logger.info('removing temp file: {}'.format(temp_filepath))
-    subprocess.check_call(["rm", "-f", temp_filepath])
+    sudo_call(["rm", "-f", temp_filepath])
 
     logger.info('network is down.')
 
