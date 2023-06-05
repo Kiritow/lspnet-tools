@@ -8,7 +8,11 @@ from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClie
 from get_logger import get_logger
 
 logger = get_logger('app')
-GIT_VERSION = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], encoding='utf-8').strip()
+
+try:
+    GIT_VERSION = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], encoding='utf-8').strip()
+except Exception:
+    GIT_VERSION = "https://github.com/Kiritow/lspnet-tools"
 
 
 def load_or_create_keys(namespace, name):
