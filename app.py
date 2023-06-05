@@ -1,9 +1,19 @@
-import toml
+import sys
+try:
+    import tomllib as toml
+except ModuleNotFoundError:
+    try:
+        sys.stderr.write('tomlib not found (python 3.11+), try tomli\n')
+        import tomli as toml
+    except ModuleNotFoundError:
+        sys.stderr.write('tomli not found (pip3 pinstall tomli), try tomli\n')
+        import toml
+
+
 import subprocess
 import json
 import time
 import traceback
-import sys
 import os
 import ipaddress
 import socket
@@ -286,6 +296,15 @@ def config_up(parser: NetworkConfigParser):
         f.write(parser.network_bird_config)
 
     logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
+
+    # Remove bird contianer if exists
+    try:
+        sudo_call(["podman", "container", "exists", "{}-router".format(parser.namespace)])
+        logger.info('found existing container, remove it...')
+        sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
+    except Exception:
+        logger.warn(traceback.format_exc())
+        logger.warn('container does not exist, skip removing.')
 
     # Start bird container
     logger.info('starting router...')
