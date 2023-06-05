@@ -45,7 +45,9 @@ def sudo_call_output(args):
 
 
 def ensure_netns(namespace):
-    result = json.loads(subprocess.check_output(["ip", "-j", "netns", "list"], encoding='utf-8'))
+    result = subprocess.check_output(["ip", "-j", "netns", "list"])
+    print(result)
+    result = json.loads(result)
     for config in result:
         if config['name'] == namespace:
             return
@@ -184,7 +186,9 @@ def ensure_ip_forward(namespace):
 
 
 def get_eth_ip(name):
-    result = json.loads(sudo_call_output(["ip", "-j", "address", "show", "dev", name]))
+    result = sudo_call_output(["ip", "-j", "address", "show", "dev", name])
+    print(result)
+    result = json.loads(result)
     return [addr_info['local'] for addr_info in result[0]['addr_info'] if addr_info['family'] == 'inet'][0]
 
 
@@ -327,7 +331,9 @@ def config_down(parser: NetworkConfigParser):
     clear_iptables(parser.namespace)
 
     for interface_name in parser.interfaces:
-        result = json.loads(sudo_call_output(["ip", "-j", "-n", parser.namespace, "link"]))
+        result = sudo_call_output(["ip", "-j", "-n", parser.namespace, "link"])
+        print(result)
+        result = json.loads(result)
         for if_config in result:
             if if_config['ifname'] == interface_name:
                 # Found interface, remove it
