@@ -1,0 +1,14 @@
+[Unit]
+Description=Network Tools AutoStart for %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=__INSTALL_DIR__
+ExecStart=python3 app.py up %i.toml
+ExecStop=python3 app.py down %i.toml
+
+[Install]
+WantedBy=multi-user.target

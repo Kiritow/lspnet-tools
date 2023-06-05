@@ -326,7 +326,7 @@ def config_up(parser: NetworkConfigParser):
 
 def config_down(parser: NetworkConfigParser):
     ensure_netns(parser.namespace)
-        
+
     # stop all tasks
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
     sudo_call(["systemctl", "stop", "{}-*.timer".format(task_prefix)])
