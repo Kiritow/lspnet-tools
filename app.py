@@ -7,7 +7,7 @@ import sys
 import os
 import ipaddress
 import uuid
-from network_configparser import NetworkConfigParser
+from network_configparser import NetworkConfigParser, load_or_create_keys
 from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig
 from get_logger import get_logger
 
@@ -317,8 +317,8 @@ def config_down(parser: NetworkConfigParser):
     sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
     
     logger.info('removing temp file: {}'.format(temp_filepath))
-    os.unlink(temp_filepath)
-    
+    subprocess.check_call(["rm", "-f", temp_filepath])
+
     logger.info('network is down.')
 
 
@@ -351,8 +351,9 @@ def import_wg_keys(parser: NetworkConfigParser, wg_conf_name):
 if __name__ == "__main__":
     action = sys.argv[1]
     conf_file = sys.argv[2]
-
+    
     config_parser = NetworkConfigParser(toml.loads(open(conf_file).read()))
+
     if action == 'up':
         config_up(config_parser)
     elif action == 'down':
@@ -360,5 +361,9 @@ if __name__ == "__main__":
     elif action == 'import':
         interface_name = sys.argv[3]
         import_wg_keys(config_parser, interface_name)
+    elif action == 'new':
+        interface_name = sys.argv[3]
+        data = load_or_create_keys(config_parser.namespace, interface_name)
+        print('new key created: {}'.format(data['public']))
     else:
         logger.error('unknown action {}'.format(action))
