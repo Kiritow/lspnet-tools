@@ -6,6 +6,7 @@ import traceback
 import sys
 import os
 import ipaddress
+import socket
 import uuid
 from network_configparser import NetworkConfigParser, load_or_create_keys
 from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig
@@ -63,7 +64,16 @@ def assign_wg_device(namespace, name, private_key, listen_port, peer, endpoint, 
     if peer:
         config_items.extend(["peer", peer])
         if endpoint:
-            config_items.extend(["endpoint", endpoint])
+            # DNS resolve first
+            parts = endpoint.split(':')
+            real_endpoint = socket.gethostbyname(parts[0])
+            if real_endpoint != parts[0]:
+                logger.warning('endpoint {} resolve to {}, auto-refresh is not supported yet.'.format(parts[0], real_endpoint))
+                parts[0] = real_endpoint
+                real_endpoint = ':'.join(parts)
+            else:
+                real_endpoint = endpoint
+            config_items.extend(["endpoint", real_endpoint])
         if keepalive:
             config_items.extend(["persistent-keepalive", str(keepalive)])
         if allowed_ips:
