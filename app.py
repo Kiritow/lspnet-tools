@@ -47,6 +47,10 @@ def sudo_call_output(args):
 def ensure_netns(namespace):
     result = subprocess.check_output(["ip", "-j", "netns", "list"])
     print(result)
+    if not result:
+        logger.warning('[FIX] ip command does not return valid json text, return empty array')
+        result = '[]'
+
     result = json.loads(result)
     for config in result:
         if config['name'] == namespace:
