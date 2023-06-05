@@ -1,7 +1,9 @@
+import os
 import json
 import subprocess
 from datetime import datetime, timedelta
 import ipaddress
+import traceback
 from typing import Dict
 
 from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig
@@ -12,7 +14,18 @@ logger = get_logger('app')
 try:
     GIT_VERSION = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], encoding='utf-8').strip()
 except Exception:
-    GIT_VERSION = "https://github.com/Kiritow/lspnet-tools"
+    logger.warning(traceback.format_exc())
+    logger.warning('unable to get version by git command, try .git parsing...')
+    try:
+        content = open('.git/HEAD').read().strip()
+        if 'ref:' in content:
+            real_path = os.path.join('.git', content.split(':')[1].strip())
+            GIT_VERSION = open(real_path).read().strip()
+        else:
+            GIT_VERSION = content
+    except Exception:
+        logger.warning(traceback.format_exc())
+        GIT_VERSION = "https://github.com/Kiritow/lspnet-tools"
 
 
 def load_or_create_keys(namespace, name):
