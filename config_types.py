@@ -15,6 +15,15 @@ class CommonOSPFConfig:
 
 
 @dataclass
+class BFDConfig:
+    intervalMs: int = 0
+    txMs: int = 0
+    rxMs: int = 0
+    idleMs: int = 0
+    multiplier: int = 0
+
+
+@dataclass
 class ConnectorPhantunClientConfig:
     local: str
     remote: str
@@ -60,6 +69,8 @@ class InterfaceConfig:
     autoconnect: bool = False
     enable_ospf: bool = False
     ospf_config: CommonOSPFConfig = None
+    enable_bfd: bool = False
+    bfd_config: BFDConfig = None
     connector: Union[ConnectorPhantunClientConfig, ConnectorPhantunClientConfig] = None
 
     def validate(self):
