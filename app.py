@@ -404,5 +404,7 @@ if __name__ == "__main__":
         interface_name = sys.argv[3]
         data = load_or_create_keys(config_parser.namespace, interface_name)
         print('new key created: {}'.format(data['public']))
+    elif action == 'test':
+        print(config_parser.network_bird_config)
     else:
         logger.error('unknown action {}'.format(action))

@@ -99,7 +99,7 @@ algorithm hmac sha512;
     all_bfd_texts = []
     for interface_name, bfd_interface_config in bfd_config.items():
         text_parts = []
-        text_parts.append(f'''interface "{interface_name} {{''')
+        text_parts.append(f'''interface "{interface_name}" {{''')
         if bfd_interface_config.rxMs or bfd_interface_config.intervalMs:
             text_parts.append(f'''min rx interval {bfd_interface_config.rxMs or bfd_interface_config.intervalMs}ms;''')
         if bfd_interface_config.txMs or bfd_interface_config.intervalMs:
