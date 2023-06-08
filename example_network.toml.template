@@ -1,0 +1,77 @@
+hostname = "example_dc1"
+namespace = "example"
+
+# prefix: interface name prefix, default to hostname
+# prefix = "global_dc"
+
+# routerid: isolated BIRD router id
+# routerid = "192.168.1.1"
+
+# omit local section to skip local network creation
+[local]
+enable = true  # enable veth link, default to true
+exit = true  # act as exit node, default to true
+# name = "example-veth"  # veth link prefix, default to {namespace}-veth
+address = "172.16.0.0/30"  # veth link address, /30 subnet recommended. host will use the first available address.
+ethname = "eth0"  # nic card name of default gateway
+
+ospf = false  # enable ospf on veth link, default to false
+# the following config is only required when ospf=true
+area = 0  # OSPF area ID
+cost = 10  # OSPF link cost
+auth = 'password'  # OSPF authentication, default to empty (disable authentication)
+
+# omit local.mapping section to skip local network mapping
+[[local.mapping]]
+from = "172.18.0.0/24"
+to = "172.20.0.0/24"
+num = 1  # nfqueue number
+
+# network config
+[config]
+ospf = true  # enable ospf on internal network, default to true
+# the following config is only required when ospf=true
+area = 0  # OSPF area ID
+cost = 10  # OSPF link cost
+auth = 'password'  # OSPF authentication, default to empty (disable authentication)
+
+bfd = false  # enable BFD on internal network, default to false
+# the following config is only required when bfd=true
+bfd_interval = 1000  # rx/tx interval in ms
+bfd_rx = 1000  # rx interval in ms, default to bfd_interval
+bfd_tx = 1000  # tx interval in ms, default to bfd_interval
+bfd_idle = 10000  # idle interval in ms
+bfd_multiplier = 5
+
+# networks.{name}
+[networks.link1]
+address = "172.25.1.1/30"  # WireGuard interface address. /30 subnet recommended.
+mtu = 1420  # MTU. default to 1420
+# listen = 51820  # WireGuard listen port. default to empty and WireGuard will automatically select one upon link is up.
+peer = '<WireGuard Peer Public Key>'
+# endpoint = '<WireGuard Peer Address>'
+# keepalive = 25  # wireguard keepalive seconds. default to 0.
+
+ospf = true  # enable OSPF on this link. default to [config.ospf]
+# the following config is only required when ospf=true
+area = 0  # OSPF area ID
+cost = 10  # OSPF link cost
+auth = 'password'  # OSPF authentication, default to empty (disable authentication)
+
+bfd = false  # enable BFD on this link. default to [config.bfd]
+# the following config is only required when bfd=true
+bfd_interval = 1000  # rx/tx interval in ms
+bfd_rx = 1000  # rx interval in ms, default to bfd_interval
+bfd_tx = 1000  # tx interval in ms, default to bfd_interval
+bfd_idle = 10000  # idle interval in ms
+bfd_multiplier = 5
+
+# `connector` section, optional. If no connector config specified, direct WireGuard link will be established.
+[networks.link1.connector]
+type = "phantun-server"  # connector type
+
+# the following config is connector-type related
+listen = 1818
+tun-name = "tun0"
+tun-local = "192.168.201.1"
+tun-peer = "192.168.201.2"
