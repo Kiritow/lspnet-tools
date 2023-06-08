@@ -165,6 +165,7 @@ class NetworkConfigParser:
             self.enable_local_network = False
         else:
             self.enable_local_network = True
+            self.enable_veth_link = local_config.get('enable', True)
             self.local_is_exit_node = local_config.get('exit', True)
             self.local_veth_prefix = local_config.get('name', '{}-veth'.format(self.namespace))
 

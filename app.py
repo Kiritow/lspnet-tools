@@ -268,17 +268,23 @@ def config_up(parser: NetworkConfigParser):
     
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
 
-    if parser.enable_local_network:
+    if parser.enable_local_network and parser.enable_veth_link:
         create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_interface.address)
         sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_interface.address, "-d", parser.local_interface.address, "-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
         sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_interface.address, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
 
-        if parser.local_is_exit_node:
-            sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_interface.name, "-j", "MASQUERADE"])
+    if parser.enable_local_network and parser.local_is_exit_node:
+        sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_interface.name, "-j", "MASQUERADE"])
+
+    # Network mapping
+    if parser.enable_local_network and parser.local_network_mapping:
+        for mapping_config_item in parser.local_network_mapping:
+            start_nfq_workers(task_prefix, INSTALL_DIR, parser.namespace, mapping_config_item, parser.local_interface.name)
 
     # PMTU fix
     sudo_call(["ip", "netns", "exec", parser.namespace, "iptables", "-A", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"])
 
+    # WireGuard
     for interface_name, interface_item in parser.interfaces.items():
         create_wg_device(parser.namespace, interface_name, interface_item.address, interface_item.mtu)
         assign_wg_device(parser.namespace, interface_name, interface_item.private, interface_item.listen, interface_item.peer, interface_item.endpoint, interface_item.keepalive, interface_item.allowed)
@@ -292,11 +298,6 @@ def config_up(parser: NetworkConfigParser):
                 start_phantun_client(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name)
             elif isinstance(connector_item, ConnectorPhantunServerConfig):
                 start_phantun_server(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name, interface_item)
-
-    # Network mapping
-    if parser.local_network_mapping:
-        for mapping_config_item in parser.local_network_mapping:
-            start_nfq_workers(task_prefix, INSTALL_DIR, parser.namespace, mapping_config_item, parser.local_interface.name)
 
     # BIRD config
     temp_filename = '/tmp/{}-{}.conf'.format(parser.namespace, uuid.uuid4())
@@ -343,7 +344,7 @@ def config_down(parser: NetworkConfigParser):
                 # Found interface, remove it
                 sudo_call(["ip", "-n", parser.namespace, "link", "del", "dev", interface_name])
 
-    if parser.enable_local_network:
+    if parser.enable_local_network and parser.enable_veth_link:
         sudo_call(["ip", "link", "del", "dev", "{}0".format(parser.local_veth_prefix)])
 
     sudo_call(["podman", "container", "exists", "{}-router".format(parser.namespace)])
