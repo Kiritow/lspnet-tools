@@ -6,13 +6,12 @@ except ModuleNotFoundError:
         sys.stderr.write('tomlib not found (python 3.11+), try tomli\n')
         import tomli as toml
     except ModuleNotFoundError:
-        sys.stderr.write('tomli not found (pip3 pinstall tomli), try tomli\n')
+        sys.stderr.write('tomli not found (pip3 pinstall tomli), try toml\n')
         import toml
 
 
 import subprocess
 import json
-import time
 import traceback
 import os
 import ipaddress
@@ -113,12 +112,12 @@ def create_veth_device(namespace, name, veth_network):
 
     sudo_call(["ip", "link", "add", host_name, "type", "veth", "peer", peer_name])
     sudo_call(["ip", "link", "set", "dev", peer_name, "netns", namespace])
-    
+
     vnetwork = ipaddress.ip_network(veth_network)
     vaddrs = list(vnetwork.hosts())
     host_addr = "{}/{}".format(vaddrs[0], vnetwork.prefixlen)
     peer_addr = "{}/{}".format(vaddrs[1], vnetwork.prefixlen)
-    
+
     sudo_call(["ip", "address", "add", "dev", host_name, host_addr])
     sudo_call(["ip", "-n", namespace, "address", "add", "dev", peer_name, peer_addr])
 
@@ -177,7 +176,7 @@ def ensure_iptables(namespace):
 
     try_create_iptables_chain("mangle", f"{namespace}-POSTROUTING")
     try_insert_iptables_rule("mangle", "POSTROUTING", ["-j", "{}-POSTROUTING".format(namespace)])
-    
+
     try_create_iptables_chain("filter", f"{namespace}-FORWARD")
     try_insert_iptables_rule("filter", "FORWARD", ["-j", "{}-FORWARD".format(namespace)])
 
@@ -214,7 +213,7 @@ def get_eth_ip(name):
 
 def start_phantun_client(unit_prefix, install_dir, namespace, connector_item: ConnectorPhantunClientConfig, eth_name):
     bin_path = os.path.join(install_dir, "bin", "phantun_client")
-    
+
     try_append_iptables_rule("nat", f"{namespace}-POSTROUTING", ["-s", connector_item.tun_peer, "-o", eth_name, "-j", "MASQUERADE"])
     try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-i", connector_item.tun_name, "-j", "ACCEPT"])
     try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-o", connector_item.tun_name, "-j", "ACCEPT"])
@@ -227,7 +226,7 @@ def start_phantun_client(unit_prefix, install_dir, namespace, connector_item: Co
 def start_phantun_server(unit_prefix, install_dir, namespace, connector_item: ConnectorPhantunServerConfig, eth_name, interface_item: InterfaceConfig):
     bin_path = os.path.join(install_dir, "bin", "phantun_server")
     connector_item.dynamic_inject(interface_item)
-    
+
     try_append_iptables_rule("nat", f"{namespace}-PREROUTING", ["-p", "tcp", "-i", eth_name, "--dport", str(connector_item.local), "-j", "DNAT", "--to-destination", connector_item.tun_peer])
     try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-i", connector_item.tun_name, "-j", "ACCEPT"])
     try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-o", connector_item.tun_name, "-j", "ACCEPT"])
@@ -397,7 +396,7 @@ def import_wg_keys(parser: NetworkConfigParser, wg_conf_name):
 if __name__ == "__main__":
     conf_file = sys.argv[1]
     action = sys.argv[2]
-    
+
     # compatible with old version
     if not os.path.exists(conf_file) and os.path.exists(action):
         logger.warning('new version requires conf_file as 1st place. please adjust your script to avoid future breaking changes')

@@ -11,7 +11,7 @@ FMT_RESET = "\x1b[0m"
 class ColoredFormatter(logging.Formatter):
     def __init__(self, real_format):
         self.real_format = real_format
-        
+
         self.format_map = {
             logging.DEBUG: FMT_GRAY + real_format + FMT_RESET,
             logging.INFO: FMT_GRAY + real_format + FMT_RESET,
