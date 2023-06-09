@@ -255,6 +255,28 @@ def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkM
     try_append_iptables_rule("raw", f"{namespace}-PREROUTING", ["-i", eth_name, "-s", config_item.to_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number + 1)])
 
 
+def shutdown_podman_router(namespace):
+    container_name = "{}-router".format(namespace)
+
+    container_list = sudo_call_output(["podman", "ps", "-a", "--format=json"])
+    container_list = json.loads(container_list)
+    for container_info in container_list:
+        if container_name in container_info['Names']:
+            logger.info('found container {} with names: {}'.format(container_info['Id'], container_info['Names']))
+
+            container_inspect_result = sudo_call_output(["podman", "container", "inspect", container_info['Id']])
+            container_inspect_result = json.loads(container_inspect_result)
+            temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result[0]["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(namespace))][0]
+
+            logger.info('removing container: {}'.format(container_info['Id']))
+            sudo_call(["podman", "rm", "-f", container_info['Id']])
+
+            logger.info('removing temp file: {}'.format(temp_filepath))
+            sudo_call(["rm", "-f", temp_filepath])
+
+            return
+
+
 def config_up(parser: NetworkConfigParser):
     ensure_netns(parser.namespace)
     ensure_iptables(parser.namespace)
@@ -306,13 +328,7 @@ def config_up(parser: NetworkConfigParser):
     logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
 
     # Remove bird contianer if exists
-    try:
-        sudo_call(["podman", "container", "exists", "{}-router".format(parser.namespace)])
-        logger.info('found existing container, remove it...')
-        sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.warning('container does not exist, skip removing.')
+    shutdown_podman_router(parser.namespace)
 
     # Start bird container
     logger.info('starting router...')
@@ -346,17 +362,8 @@ def config_down(parser: NetworkConfigParser):
     if parser.enable_local_network and parser.enable_veth_link:
         sudo_call(["ip", "link", "del", "dev", "{}0".format(parser.local_veth_prefix)])
 
-    sudo_call(["podman", "container", "exists", "{}-router".format(parser.namespace)])
-    container_inspect_result = json.loads(sudo_call_output(["podman", "container", "inspect", "{}-router".format(parser.namespace)]))
-    temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result[0]["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(parser.namespace))][0]
-
     # Stop bird container
-    logger.info('stopping router... (wait 3s for ospf)')
-    time.sleep(3)
-    sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
-    
-    logger.info('removing temp file: {}'.format(temp_filepath))
-    sudo_call(["rm", "-f", temp_filepath])
+    shutdown_podman_router(parser.namespace)
 
     logger.info('network is down.')
 
