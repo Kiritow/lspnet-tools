@@ -271,7 +271,6 @@ def config_up(parser: NetworkConfigParser):
 
     if parser.enable_local_network and parser.local_is_exit_node:
         try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-o", parser.local_interface.name, "-j", "MASQUERADE"])
-        try_append_iptables_rule("filter", f"{parser.namespace}-FORWARD", ["-i", "{}0".format(parser.local_veth_prefix), "-o", parser.local_interface.name, "-j", "ACCEPT"])
 
     if parser.enable_local_network and parser.local_interface.enable_ospf:
         try_append_iptables_rule("filter", f"{parser.namespace}-INPUT", ["-p", "ospf", "-j", "ACCEPT"])
