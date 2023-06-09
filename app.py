@@ -128,7 +128,7 @@ def create_veth_device(namespace, name, veth_network):
 
 def try_create_iptables_chain(table_name, chain_name):
     try:
-        sudo_call_output(["iptables", "-t", table_name, "-N", chain_name])
+        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-N", chain_name]), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
     except subprocess.CalledProcessError as e:
         if 'iptables: Chain already exists.' not in e.stderr:
             raise
@@ -138,7 +138,7 @@ def try_create_iptables_chain(table_name, chain_name):
 
 def try_append_iptables_rule(table_name, chain_name, rule_args):
     try:
-        sudo_call_output(["iptables", "-t", table_name, "-C", chain_name] + rule_args)
+        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-C", chain_name] + rule_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
     except subprocess.CalledProcessError as e:
         if 'iptables: Bad rule (does a matching rule exist in that chain?)' not in e.stderr:
             raise
@@ -149,7 +149,7 @@ def try_append_iptables_rule(table_name, chain_name, rule_args):
 
 def try_insert_iptables_rule(table_name, chain_name, rule_args):
     try:
-        sudo_call_output(["iptables", "-t", table_name, "-C", chain_name] + rule_args)
+        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-C", chain_name] + rule_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
     except subprocess.CalledProcessError as e:
         if 'iptables: Bad rule (does a matching rule exist in that chain?)' not in e.stderr:
             raise
@@ -162,7 +162,7 @@ def try_flush_iptables(table_name, chain_name):
     try:
         sudo_call(["iptables", "-t", table_name, "-F", chain_name])
     except Exception:
-        logger.warn(traceback.format_exc())
+        logger.warning(traceback.format_exc())
 
 
 def ensure_iptables(namespace):
@@ -312,8 +312,8 @@ def config_up(parser: NetworkConfigParser):
         logger.info('found existing container, remove it...')
         sudo_call(["podman", "rm", "-f", "{}-router".format(parser.namespace)])
     except Exception:
-        logger.warn(traceback.format_exc())
-        logger.warn('container does not exist, skip removing.')
+        logger.warning(traceback.format_exc())
+        logger.warning('container does not exist, skip removing.')
 
     # Start bird container
     logger.info('starting router...')
@@ -370,7 +370,7 @@ def load_wg_keys_from_oldconf(wg_conf_name):
             if line.startswith('PrivateKey='):
                 return line.replace('PrivateKey=', '').strip()
     except Exception:
-        logger.warn(traceback.format_exc())
+        logger.warning(traceback.format_exc())
         return ''
 
 
