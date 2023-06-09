@@ -389,9 +389,15 @@ def import_wg_keys(parser: NetworkConfigParser, wg_conf_name):
 
 
 if __name__ == "__main__":
-    action = sys.argv[1]
-    conf_file = sys.argv[2]
+    conf_file = sys.argv[1]
+    action = sys.argv[2]
     
+    # compatible with old version
+    if not os.path.exists(conf_file) and os.path.exists(action):
+        logger.warning('new version requires conf_file as 1st place. please adjust your script to avoid future breaking changes')
+        conf_file, action = action, conf_file
+
+    logger.info('using config file: {}'.format(conf_file))
     config_parser = NetworkConfigParser(toml.loads(open(conf_file).read()))
 
     if action == 'up':
@@ -401,10 +407,9 @@ if __name__ == "__main__":
     elif action == 'import':
         interface_name = sys.argv[3]
         import_wg_keys(config_parser, interface_name)
-    elif action == 'new':
-        interface_name = sys.argv[3]
-        data = load_or_create_keys(config_parser.namespace, interface_name)
-        print('new key created: {}'.format(data['public']))
+    elif action == 'list':
+        for interface_name, interface_config in config_parser.interfaces.items():
+            print("{}\t{}".format(interface_name, interface_config.public))
     elif action == 'test':
         print(config_parser.network_bird_config)
     else:
