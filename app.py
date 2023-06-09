@@ -128,7 +128,7 @@ def create_veth_device(namespace, name, veth_network):
 
 def try_create_iptables_chain(table_name, chain_name):
     try:
-        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-N", chain_name]), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-N", chain_name]), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
     except subprocess.CalledProcessError as e:
         if 'iptables: Chain already exists.' not in e.stderr:
             raise
@@ -138,9 +138,9 @@ def try_create_iptables_chain(table_name, chain_name):
 
 def try_append_iptables_rule(table_name, chain_name, rule_args):
     try:
-        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-C", chain_name] + rule_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-C", chain_name] + rule_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
     except subprocess.CalledProcessError as e:
-        if 'iptables: Bad rule (does a matching rule exist in that chain?)' not in e.stderr:
+        if 'iptables: Bad rule (does a matching rule exist in that chain?)' not in e.stderr and 'iptables: No chain/target/match by that name' not in e.stderr:
             raise
 
         logger.info('iptables rule not exist, adding: iptables -t {} -A {} {}'.format(table_name, chain_name, ' '.join(rule_args)))
@@ -149,9 +149,9 @@ def try_append_iptables_rule(table_name, chain_name, rule_args):
 
 def try_insert_iptables_rule(table_name, chain_name, rule_args):
     try:
-        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-C", chain_name] + rule_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-C", chain_name] + rule_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
     except subprocess.CalledProcessError as e:
-        if 'iptables: Bad rule (does a matching rule exist in that chain?)' not in e.stderr:
+        if 'iptables: Bad rule (does a matching rule exist in that chain?)' not in e.stderr and 'iptables: No chain/target/match by that name' not in e.stderr:
             raise
 
         logger.info('iptables rule not exist, inserting: iptables -t {} -I {} {}'.format(table_name, chain_name, rule_args))
