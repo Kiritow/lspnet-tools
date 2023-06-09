@@ -28,20 +28,19 @@ INSTALL_DIR = os.path.dirname(os.path.realpath(sys.argv[0]))
 logger.info('detected INSTALL_DIR={}'.format(INSTALL_DIR))
 
 
-def sudo_call(args):
+def sudo_wrap(args):
     if os.geteuid() != 0:
         logger.warning('sudo: {}'.format(args))
-        subprocess.check_call(["sudo"] + args)
-    else:
-        subprocess.check_call(args)
+        return ["sudo"] + args
+    return args
+
+
+def sudo_call(args):
+    return subprocess.check_call(sudo_wrap(args))
 
 
 def sudo_call_output(args):
-    if os.geteuid() != 0:
-        logger.info('sudo: {}'.format(args))
-        return subprocess.check_output(["sudo"] + args, encoding='utf-8')
-    else:
-        return subprocess.check_output(args, encoding='utf-8')
+    return subprocess.check_output(sudo_wrap(args), encoding='utf-8')
 
 
 def ensure_netns(namespace):
@@ -127,57 +126,74 @@ def create_veth_device(namespace, name, veth_network):
     sudo_call(["ip", "-n", namespace, "link", "set", "dev", peer_name, "up"])
 
 
+def try_create_iptables_chain(table_name, chain_name):
+    try:
+        sudo_call_output(["iptables", "-t", table_name, "-N", chain_name])
+    except subprocess.CalledProcessError as e:
+        if 'iptables: Chain already exists.' not in e.stderr:
+            raise
+
+        logger.info('iptables chain {} exists in {} table, skip creation.'.format(chain_name, table_name))
+
+
+def try_append_iptables_rule(table_name, chain_name, rule_args):
+    try:
+        sudo_call_output(["iptables", "-t", table_name, "-C", chain_name] + rule_args)
+    except subprocess.CalledProcessError as e:
+        if 'iptables: Bad rule (does a matching rule exist in that chain?)' not in e.stderr:
+            raise
+
+        logger.info('iptables rule not exist, adding: iptables -t {} -A {} {}'.format(table_name, chain_name, ' '.join(rule_args)))
+        sudo_call(["iptables", "-t", table_name, "-A", chain_name] + rule_args)
+
+
+def try_insert_iptables_rule(table_name, chain_name, rule_args):
+    try:
+        sudo_call_output(["iptables", "-t", table_name, "-C", chain_name] + rule_args)
+    except subprocess.CalledProcessError as e:
+        if 'iptables: Bad rule (does a matching rule exist in that chain?)' not in e.stderr:
+            raise
+
+        logger.info('iptables rule not exist, inserting: iptables -t {} -I {} {}'.format(table_name, chain_name, rule_args))
+        sudo_call(["iptables", "-t", table_name, "-I", chain_name] + rule_args)
+        
+
+def try_flush_iptables(table_name, chain_name):
+    try:
+        sudo_call(["iptables", "-t", table_name, "-F", chain_name])
+    except Exception:
+        logger.warn(traceback.format_exc())
+
+
 def ensure_iptables(namespace):
-    try:
-        sudo_call(["iptables", "-t", "nat", "-N", "{}-POSTROUTING".format(namespace)])
-        sudo_call(["iptables", "-t", "nat", "-I", "POSTROUTING", "-j", "{}-POSTROUTING".format(namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.info('iptables chain exists, skip creation.')
+    try_create_iptables_chain("nat", f"{namespace}-POSTROUTING")
+    try_insert_iptables_rule("nat", "POSTROUTING", ["-j", "{}-POSTROUTING".format(namespace)])
 
-    try:
-        sudo_call(["iptables", "-t", "nat", "-N", "{}-PREROUTING".format(namespace)])
-        sudo_call(["iptables", "-t", "nat", "-I", "PREROUTING", "-j", "{}-PREROUTING".format(namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.info('iptables chain exists, skip creation.')
+    try_create_iptables_chain("nat", f"{namespace}-PREROUTING")
+    try_insert_iptables_rule("nat", "PREROUTING", ["-j", "{}-PREROUTING".format(namespace)])
 
-    try:
-        sudo_call(["iptables", "-t", "raw", "-N", "{}-PREROUTING".format(namespace)])
-        sudo_call(["iptables", "-t", "raw", "-I", "PREROUTING", "-j", "{}-PREROUTING".format(namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.info('iptables chain exists, skip creation.')
+    try_create_iptables_chain("raw", f"{namespace}-PREROUTING")
+    try_insert_iptables_rule("raw", "PREROUTING", ["-j", "{}-PREROUTING".format(namespace)])
 
-    try:
-        sudo_call(["iptables", "-t", "mangle", "-N", "{}-POSTROUTING".format(namespace)])
-        sudo_call(["iptables", "-t", "mangle", "-I", "POSTROUTING", "-j", "{}-POSTROUTING".format(namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.info('iptables chain exists, skip creation.')
+    try_create_iptables_chain("mangle", f"{namespace}-POSTROUTING")
+    try_insert_iptables_rule("mangle", "POSTROUTING", ["-j", "{}-POSTROUTING".format(namespace)])
+    
+    try_create_iptables_chain("filter", f"{namespace}-FORWARD")
+    try_insert_iptables_rule("filter", "FORWARD", ["-j", "{}-FORWARD".format(namespace)])
+
+    try_create_iptables_chain("filter", f"{namespace}-INPUT")
+    try_insert_iptables_rule("filter", "INPUT", ["-j", "{}-INPUT".format(namespace)])
 
 
 def clear_iptables(namespace):
-    try:
-        sudo_call(["iptables", "-t", "nat", "-F", "{}-POSTROUTING".format(namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
-    
-    try:
-        sudo_call(["iptables", "-t", "nat", "-F", "{}-PREROUTING".format(namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
-    
-    try:
-        sudo_call(["iptables", "-t", "raw", "-F", "{}-PREROUTING".format(namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
-    
-    try:
-        sudo_call(["iptables", "-t", "mangle", "-F", "{}-POSTROUTING".format(namespace)])
-    except Exception:
-        logger.warning(traceback.format_exc())
+    try_flush_iptables("nat", f"{namespace}-POSTROUTING")
+    try_flush_iptables("nat", f"{namespace}-PREROUTING")
+    try_flush_iptables("raw", f"{namespace}-PREROUTING")
+    try_flush_iptables("mangle", f"{namespace}-POSTROUTING")
+    try_flush_iptables("filter", f"{namespace}-FORWARD")
+    try_flush_iptables("filter", f"{namespace}-INPUT")
 
+    # in namespace
     try:
         sudo_call(["ip", "netns", "exec", namespace, "iptables", "-F", "FORWARD"])
     except Exception:
@@ -199,12 +215,10 @@ def get_eth_ip(name):
 def start_phantun_client(unit_prefix, install_dir, namespace, connector_item: ConnectorPhantunClientConfig, eth_name):
     bin_path = os.path.join(install_dir, "bin", "phantun_client")
     
-    try:
-        sudo_call(["iptables", "-t", "nat", "-C", "{}-POSTROUTING".format(namespace), "-s", connector_item.tun_peer, "-o", eth_name, "-j", "MASQUERADE"])
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.info('iptables rule not exist, try to insert one...')
-        sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(namespace), "-s", connector_item.tun_peer, "-o", eth_name, "-j", "MASQUERADE"])
+    try_append_iptables_rule("nat", f"{namespace}-POSTROUTING", ["-s", connector_item.tun_peer, "-o", eth_name, "-j", "MASQUERADE"])
+    try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-i", connector_item.tun_name, "-j", "ACCEPT"])
+    try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-o", connector_item.tun_name, "-j", "ACCEPT"])
+    try_append_iptables_rule("filter", f"{namespace}-INPUT", ["-p", "tcp", "--dport", str(connector_item.local), "-j", "ACCEPT"])
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", "-E", "RUST_LOG=debug",
                bin_path, "--local", str(connector_item.local), "--remote", str(connector_item.remote), "--tun", connector_item.tun_name, "--tun-local", connector_item.tun_local, "--tun-peer", connector_item.tun_peer])
@@ -214,15 +228,10 @@ def start_phantun_server(unit_prefix, install_dir, namespace, connector_item: Co
     bin_path = os.path.join(install_dir, "bin", "phantun_server")
     connector_item.dynamic_inject(interface_item)
     
-    call_args = ["iptables", "-t", "nat", "-C", "{}-PREROUTING".format(namespace), "-p", "tcp", "-i", eth_name, "--dport", str(connector_item.local), "-j", "DNAT", "--to-destination", connector_item.tun_peer]
-
-    try:
-        sudo_call(call_args)
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.info('iptables rule not exist, try to insert one...')
-        call_args[3] = '-A'
-        sudo_call(call_args)
+    try_append_iptables_rule("nat", f"{namespace}-PREROUTING", ["-p", "tcp", "-i", eth_name, "--dport", str(connector_item.local), "-j", "DNAT", "--to-destination", connector_item.tun_peer])
+    try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-i", connector_item.tun_name, "-j", "ACCEPT"])
+    try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-o", connector_item.tun_name, "-j", "ACCEPT"])
+    try_append_iptables_rule("filter", f"{namespace}-INPUT", ["-p", "tcp", "--dport", str(connector_item.local), "-j", "ACCEPT"])
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always", "-E", "RUST_LOG=debug",
                bin_path, "--local", str(connector_item.local), "--remote", str(connector_item.remote), "--tun", connector_item.tun_name, "--tun-local", connector_item.tun_local, "--tun-peer", connector_item.tun_peer])
@@ -239,42 +248,30 @@ def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkM
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
                bin_path, "--mode", "2", "--num", str(config_item.queue_number + 1), "--len", str(config_item.queue_size), "--from", config_item.to_addr, "--to", config_item.from_addr])
 
-
     # EGRESS
-    call_args1 = ["iptables", "-t", "mangle", "-C", "{}-POSTROUTING".format(namespace), "-o", eth_name, "-d", config_item.from_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number)]
-    try:
-        sudo_call(call_args1)
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.info('iptables rule not exist, try to insert one...')
-        call_args1[3] = '-A'
-        sudo_call(call_args1)
+    try_append_iptables_rule("mangle", f"{namespace}-POSTROUTING", ["-o", eth_name, "-d", config_item.from_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number)])
 
     # INGRESS
-    call_args2 = ["iptables", "-t", "raw", "-C", "{}-PREROUTING".format(namespace), "-i", eth_name, "-s", config_item.to_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number + 1)]
-    try:
-        sudo_call(call_args2)
-    except Exception:
-        logger.warning(traceback.format_exc())
-        logger.info('iptables rule not exist, try to insert one...')
-        call_args2[3] = '-A'
-        sudo_call(call_args2)
+    try_append_iptables_rule("raw", f"{namespace}-PREROUTING", ["-i", eth_name, "-s", config_item.to_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number + 1)])
 
 
 def config_up(parser: NetworkConfigParser):
     ensure_netns(parser.namespace)
     ensure_iptables(parser.namespace)
     ensure_ip_forward(parser.namespace)
-    
+
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
 
     if parser.enable_local_network and parser.enable_veth_link:
         create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_interface.address)
-        sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_interface.address, "-d", parser.local_interface.address, "-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
-        sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-s", parser.local_interface.address, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
+        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "-d", parser.local_interface.address, "-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
+        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
+        try_append_iptables_rule("filter", f"{parser.namespace}-FORWARD", ["-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
+        try_append_iptables_rule("filter", f"{parser.namespace}-FORWARD", ["-i", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
 
     if parser.enable_local_network and parser.local_is_exit_node:
-        sudo_call(["iptables", "-t", "nat", "-A", "{}-POSTROUTING".format(parser.namespace), "-o", parser.local_interface.name, "-j", "MASQUERADE"])
+        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-o", parser.local_interface.name, "-j", "MASQUERADE"])
+        try_append_iptables_rule("filter", f"{parser.namespace}-FORWARD", ["-i", "{}0".format(parser.local_veth_prefix), "-o", parser.local_interface.name, "-j", "ACCEPT"])
 
     # Network mapping
     if parser.enable_local_network and parser.local_network_mapping:
