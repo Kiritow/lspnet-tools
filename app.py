@@ -288,7 +288,6 @@ def config_up(parser: NetworkConfigParser):
         try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "-d", parser.local_interface.address, "-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
         try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
         try_append_iptables_rule("filter", f"{parser.namespace}-FORWARD", ["-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
-        try_append_iptables_rule("filter", f"{parser.namespace}-FORWARD", ["-i", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
 
     if parser.enable_local_network and parser.local_is_exit_node:
         try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-o", parser.local_interface.name, "-j", "MASQUERADE"])
@@ -309,6 +308,10 @@ def config_up(parser: NetworkConfigParser):
         create_wg_device(parser.namespace, interface_name, interface_item.address, interface_item.mtu)
         assign_wg_device(parser.namespace, interface_name, interface_item.private, interface_item.listen, interface_item.peer, interface_item.endpoint, interface_item.keepalive, interface_item.allowed)
         up_wg_device(parser.namespace, interface_name)
+
+        if interface_item.listen:
+            try_append_iptables_rule("filter", f"{parser.namespace}-INPUT", ["-p", "udp", "--dport", interface_item.listen, "-j", "ACCEPT"])
+
         patch_wg_config(parser.namespace, interface_name, interface_item)
 
         # Connector
@@ -399,7 +402,7 @@ if __name__ == "__main__":
 
     # compatible with old version
     if not os.path.exists(conf_file) and os.path.exists(action):
-        logger.warning('new version requires conf_file as 1st place. please adjust your script to avoid future breaking changes')
+        logger.warning('new version requires conf_file at 1st place. please adjust your script to avoid future breaking changes')
         conf_file, action = action, conf_file
 
     logger.info('using config file: {}'.format(conf_file))
