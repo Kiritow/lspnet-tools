@@ -25,7 +25,8 @@ class BFDConfig:
 
 @dataclass
 class ConnectorPhantunClientConfig:
-    local: str
+    local_address: str
+    local_port: int
     remote: str
     tun_name: str
     tun_local: str
@@ -34,7 +35,7 @@ class ConnectorPhantunClientConfig:
 
 @dataclass
 class ConnectorPhantunServerConfig:
-    local: str
+    local: int
     tun_name: str
     tun_local: str
     tun_peer: str

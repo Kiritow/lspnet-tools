@@ -271,7 +271,8 @@ class NetworkConfigParser:
                         new_connector.remote = '127.0.0.1:{}'.format(new_interface.listen)
                 elif connector_config['type'] == 'phantun-client':
                     new_connector = ConnectorPhantunClientConfig(
-                        '127.0.0.1:{}'.format(connector_config['listen']),
+                        '127.0.0.1',
+                        connector_config['listen'],
                         connector_config['remote'],
                         connector_config['tun-name'],
                         connector_config['tun-local'],
@@ -279,7 +280,7 @@ class NetworkConfigParser:
                     )
 
                     if new_interface.endpoint:
-                        logger.warning('interface has specified an endpoint ({}), which will be override by connector [{}]'.format(new_interface.endpoint, connector_config['type']))
+                        logger.warning('interface [{}] has specified an endpoint ({}), which will be override by connector [{}]'.format(interface_name, new_interface.endpoint, connector_config['type']))
 
                     new_interface.endpoint = '127.0.0.1:{}'.format(connector_config['listen'])
                 else:
