@@ -310,7 +310,7 @@ def config_up(parser: NetworkConfigParser):
         up_wg_device(parser.namespace, interface_name)
 
         if interface_item.listen:
-            try_append_iptables_rule("filter", f"{parser.namespace}-INPUT", ["-p", "udp", "--dport", interface_item.listen, "-j", "ACCEPT"])
+            try_append_iptables_rule("filter", f"{parser.namespace}-INPUT", ["-p", "udp", "--dport", str(interface_item.listen), "-j", "ACCEPT"])
 
         patch_wg_config(parser.namespace, interface_name, interface_item)
 
