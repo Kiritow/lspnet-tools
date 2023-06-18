@@ -254,7 +254,7 @@ def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkM
     try_append_iptables_rule("raw", f"{namespace}-PREROUTING", ["-i", eth_name, "-s", config_item.to_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number + 1)])
 
 
-def shutdown_podman_router(namespace):
+def inspect_podman_router(namespace):
     container_name = "{}-router".format(namespace)
 
     container_list = sudo_call_output(["podman", "ps", "-a", "--format=json"])
@@ -265,15 +265,22 @@ def shutdown_podman_router(namespace):
 
             container_inspect_result = sudo_call_output(["podman", "container", "inspect", container_info['Id']])
             container_inspect_result = json.loads(container_inspect_result)
-            temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result[0]["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(namespace))][0]
 
-            logger.info('removing container: {}'.format(container_info['Id']))
-            sudo_call(["podman", "rm", "-f", container_info['Id']])
+            return container_inspect_result[0]
 
-            logger.info('removing temp file: {}'.format(temp_filepath))
-            sudo_call(["rm", "-f", temp_filepath])
 
-            return
+def shutdown_podman_router(namespace):
+    container_inspect_result = inspect_podman_router(namespace)
+    if not container_inspect_result:
+        return
+
+    temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(namespace))][0]
+
+    logger.info('removing container: {}'.format(container_inspect_result['Id']))
+    sudo_call(["podman", "rm", "-f", container_inspect_result['Id']])
+
+    logger.info('removing temp file: {}'.format(temp_filepath))
+    sudo_call(["rm", "-f", temp_filepath])
 
 
 def config_up(parser: NetworkConfigParser):
@@ -370,6 +377,27 @@ def config_down(parser: NetworkConfigParser):
     logger.info('network is down.')
 
 
+def config_update(parser: NetworkConfigParser):
+    logger.warning('config update only supports BIRD config reload for now.')
+    
+    container_inspect_result = inspect_podman_router(parser.namespace)
+    if not container_inspect_result:
+        return
+
+    old_temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(parser.namespace))][0]
+
+    # BIRD config
+    temp_filename = '/tmp/{}-{}.conf'.format(parser.namespace, uuid.uuid4())
+    with open(temp_filename, 'w') as f:
+        f.write(parser.network_bird_config)
+
+    logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
+    
+    # Update
+    sudo_call(["mv", temp_filename, old_temp_filepath])
+    sudo_call(["podman", "exec", container_inspect_result['Id'], "birdc", "configure"])
+
+
 def load_wg_keys_from_oldconf(wg_conf_name):
     try:
         content = sudo_call_output(["cat", '/etc/wireguard/{}.conf'.format(wg_conf_name)])
@@ -412,6 +440,8 @@ if __name__ == "__main__":
         config_up(config_parser)
     elif action == 'down':
         config_down(config_parser)
+    elif action == 'update':
+        config_update(config_parser)
     elif action == 'import':
         interface_name = sys.argv[3]
         import_wg_keys(config_parser, interface_name)
