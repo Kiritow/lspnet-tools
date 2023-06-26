@@ -1,13 +1,16 @@
 import os
 import json
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime
+import time
 import ipaddress
 import traceback
 from typing import Dict
+from getpass import getpass
 
 from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig
 from get_logger import get_logger
+from key_manager import KeyManager
 
 logger = get_logger('app')
 
@@ -52,6 +55,30 @@ def load_or_create_keys(namespace, name):
         with open('local/{}.{}.json'.format(namespace, name), 'w') as f:
             f.write(json.dumps(data, ensure_ascii=False))
         return data
+
+
+def load_or_login_manager(domain, network, hostname):
+    try:
+        with open('local/{}.{}.token'.format(network, hostname)) as f:
+            token = f.read()
+        m = KeyManager(domain, token)
+        if not m.validate():
+            logger.warn('invalid or expired token found.')
+            token = ''
+    except FileNotFoundError:
+        token = ''
+
+    if token != '':
+        return token
+    
+    m = KeyManager(domain)
+    passwd = getpass('[Managed by {}] Password for network `{}`: '.format(domain, network))
+    m.login(network, hostname, passwd)
+    
+    with open('local/{}.{}.token'.format(network, hostname), 'w') as f:
+        f.write(m.token)
+    
+    return m.token
 
 
 def get_bird_config(router_id, direct_interface_names, ospf_exclude_import_cidrs, ospf_exclude_export_cidrs, ospf_area_config, bfd_config):
@@ -159,6 +186,13 @@ class NetworkConfigParser:
         self.ifname_prefix = root_config.get('prefix', self.hostname)
         self.router_id = root_config.get('routerid', '')
 
+        self.manager_domain = root_config.get('manager')
+        if self.manager_domain:
+            self.managed_network = root_config.get('network')
+            self.key_manager = KeyManager(self.manager_domain, load_or_login_manager(self.manager_domain, self.managed_network, self.hostname))
+        else:
+            self.key_manager = None
+
         local_config = root_config.get('local', {})
         if not local_config:
             logger.warning('no local config found, node will work in forward-mode only')
@@ -210,6 +244,10 @@ class NetworkConfigParser:
         else:
             self.enable_local_firewall = True
 
+        # Key manager
+        if self.key_manager:
+            cloud_keys = self.key_manager.list_keys()
+
         # Interfaces
         network_config = root_config['networks']
         self.interfaces : Dict[str, InterfaceConfig] = {}
@@ -251,6 +289,11 @@ class NetworkConfigParser:
             if not new_interface.validate():
                 exit(1)
 
+            # Key Manager
+            if self.key_manager:
+                if interface_name not in cloud_keys or cloud_keys[interface_name] != wg_config['public']:
+                    self.key_manager.patch_key(interface_name, wg_config['public'])
+
             # Connector
             new_connector = None
             if 'connector' in interface_config:
@@ -290,6 +333,22 @@ class NetworkConfigParser:
             new_interface.connector = new_connector
 
             self.interfaces[new_interface.name] = new_interface
+        
+        # Key Manager
+        if self.key_manager:
+            for interface_name, interface_config in network_config.items():
+                interface_real_name = "{}-{}".format(self.namespace, interface_name)
+                if self.interfaces[interface_real_name].peer:
+                    continue
+
+                while True:
+                    logger.info('[KeyManager] requesting peer key for interface {}...'.format(interface_name))                
+                    peer_key = self.key_manager.request_key(interface_name)
+                    if peer_key:
+                        logger.info('[KeyManager] got peer key: {}'.format(peer_key))
+                        self.interfaces[interface_real_name].peer = peer_key
+                        break
+                    time.sleep(1)
 
         # BIRD config
         interface_cidrs = [str(ipaddress.ip_interface(interface_item.address).network) for interface_item in self.interfaces.values() if interface_item.enable_ospf]

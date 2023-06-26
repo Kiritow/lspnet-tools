@@ -17,7 +17,7 @@ import os
 import ipaddress
 import socket
 import uuid
-from network_configparser import NetworkConfigParser, load_or_create_keys
+from network_configparser import NetworkConfigParser
 from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig
 from get_logger import get_logger
 
