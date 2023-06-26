@@ -1,5 +1,8 @@
 import requests
+from get_logger import get_logger
 
+
+logger = get_logger('app')
 
 class KeyManager:
     def __init__(self, domain_prefix, token='') -> None:
@@ -21,6 +24,8 @@ class KeyManager:
         self.token = r.content.decode()
 
     def validate(self):
+        logger.info('[KeyManager] validating token...')
+
         r = requests.get('{}/info'.format(self.domain_prefix), headers={
             'x-service-token': self.token,
         })
@@ -30,6 +35,8 @@ class KeyManager:
         return r.json()
 
     def request_key(self, host):
+        logger.info('[KeyManager] requesting key {}...'.format(host))
+
         r = requests.post('{}/wg/request'.format(self.domain_prefix), headers={
             'x-service-token': self.token,
         }, json={"host": host})
@@ -42,6 +49,8 @@ class KeyManager:
         return ""
 
     def list_keys(self):
+        logger.info('[KeyManager] fetching keys...')
+
         r = requests.get("{}/wg/list".format(self.domain_prefix), headers={
             'x-service-token': self.token,
         })
@@ -50,6 +59,8 @@ class KeyManager:
         return r.json()
 
     def patch_key(self, name, key):
+        logger.info('[KeyManager] patching key {}...'.format(name))
+
         r = requests.post('{}/wg/create'.format(self.domain_prefix), headers={
             'x-service-token': self.token,
         }, json={"name": name, "key": key})

@@ -342,7 +342,7 @@ class NetworkConfigParser:
                     continue
 
                 while True:
-                    logger.info('[KeyManager] requesting peer key for interface {}...'.format(interface_name))                
+                    logger.info('[KeyManager] requesting peer key for interface {}...'.format(interface_name))
                     peer_key = self.key_manager.request_key(interface_name)
                     if peer_key:
                         logger.info('[KeyManager] got peer key: {}'.format(peer_key))
