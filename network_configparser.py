@@ -261,7 +261,7 @@ class NetworkConfigParser:
                 interface_config.get('mtu', 1420),
                 interface_config['address'],
                 interface_config.get('listen', 0),
-                interface_config['peer'],
+                interface_config.get('peer', '') if self.key_manager else interface_config['peer'],
                 '0.0.0.0/0',
                 interface_config.get('endpoint', ''),
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),
@@ -341,14 +341,17 @@ class NetworkConfigParser:
                 if self.interfaces[interface_real_name].peer:
                     continue
 
+                retry_counter = 0 
+
                 while True:
-                    logger.info('[KeyManager] requesting peer key for interface {}...'.format(interface_name))
+                    logger.info('requesting peer key for interface {}...{}'.format(interface_name, " (tried {} time{})".format(retry_counter, 's' if retry_counter > 1 else '') if retry_counter else ''))
                     peer_key = self.key_manager.request_key(interface_name)
                     if peer_key:
-                        logger.info('[KeyManager] got peer key: {}'.format(peer_key))
+                        logger.info('got peer key: {}'.format(peer_key))
                         self.interfaces[interface_real_name].peer = peer_key
                         break
                     time.sleep(1)
+                    retry_counter += 1
 
         # BIRD config
         interface_cidrs = [str(ipaddress.ip_interface(interface_item.address).network) for interface_item in self.interfaces.values() if interface_item.enable_ospf]
