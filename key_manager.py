@@ -21,7 +21,7 @@ class KeyManager:
         self.token = r.content.decode()
 
     def validate(self):
-        r = requests.get('/info', headers={
+        r = requests.get('{}/info'.format(self.domain_prefix), headers={
             'x-service-token': self.token,
         })
         if r.status_code != 200:

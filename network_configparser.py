@@ -188,7 +188,7 @@ class NetworkConfigParser:
 
         self.manager_domain = root_config.get('manager')
         if self.manager_domain:
-            self.managed_network = root_config.get('network')
+            self.managed_network = root_config.get('network', self.namespace)
             self.key_manager = KeyManager(self.manager_domain, load_or_login_manager(self.manager_domain, self.managed_network, self.hostname))
         else:
             self.key_manager = None
