@@ -7,7 +7,7 @@ logger = get_logger('app')
 class KeyManager:
     def __init__(self, domain_prefix, token='') -> None:
         self.domain_prefix = domain_prefix
-        if not self.domain_prefix.startswith('https://') or not self.domain_prefix.startswith('http://'):
+        if not self.domain_prefix.startswith('https://') and not self.domain_prefix.startswith('http://'):
             self.domain_prefix = 'https://' + self.domain_prefix
 
         self.token = token
@@ -23,12 +23,26 @@ class KeyManager:
 
         self.token = r.content.decode()
 
+    def do_post(self, url, data=None, must_success=True):
+        r = requests.post('{}{}'.format(self.domain_prefix, url), headers={
+            'x-service-token': self.token,
+        }, json=data, timeout=10)
+        if must_success and r.status_code != 200:
+            raise Exception('[POST] {}{} failed with status {}, error: {}'.format(self.domain_prefix, url, r.status_code, r.content))
+        return r
+
+    def do_get(self, url, params=None, must_success=True):
+        r = requests.get('{}{}'.format(self.domain_prefix, url), headers={
+            'x-service-token': self.token,
+        }, params=params, timeout=10)
+        if must_success and r.status_code != 200:
+            raise Exception('[POST] {}{} failed with status {}, error: {}'.format(self.domain_prefix, url, r.status_code, r.content))
+        return r
+
     def validate(self):
         logger.info('[KeyManager] validating token...')
 
-        r = requests.get('{}/info'.format(self.domain_prefix), headers={
-            'x-service-token': self.token,
-        })
+        r = self.do_get('/info', must_success=False)
         if r.status_code != 200:
             return None
 
@@ -37,12 +51,9 @@ class KeyManager:
     def request_key(self, host):
         logger.info('[KeyManager] requesting key {}...'.format(host))
 
-        r = requests.post('{}/wg/request'.format(self.domain_prefix), headers={
-            'x-service-token': self.token,
-        }, json={"host": host})
-        if r.status_code != 200:
-            raise Exception('request key failed, status: {}, error: {}'.format(r.status_code, r.content))
-
+        r = self.do_post('/wg/request', data={
+            "host": host,
+        })
         status = r.json()["status"]
         if status == "ready":
             return r.json()["key"]
@@ -51,18 +62,30 @@ class KeyManager:
     def list_keys(self):
         logger.info('[KeyManager] fetching keys...')
 
-        r = requests.get("{}/wg/list".format(self.domain_prefix), headers={
-            'x-service-token': self.token,
-        })
-        if r.status_code != 200:
-            raise Exception('unable to list keys, status: {}, error: {}'.format(r.status_code, r.content))
+        r = self.do_get("/wg/list")
         return r.json()
 
     def patch_key(self, name, key):
         logger.info('[KeyManager] patching key {}...'.format(name))
 
-        r = requests.post('{}/wg/create'.format(self.domain_prefix), headers={
-            'x-service-token': self.token,
-        }, json={"name": name, "key": key})
-        if r.status_code != 200:
-            raise Exception('patch key failed, status: {}, error: {}'.format(r.status_code, r.content))
+        self.do_post("/wg/create", data={
+            "name": name,
+            "key": key,
+        })
+
+    def list_links(self):
+        logger.info('[KeyManager] fetching links...')
+
+        r = self.do_get('/link/list')
+        return r.json()
+
+    def create_link(self, name, address, mtu, keepalive):
+        logger.info('[KeyManager] creating link {}...'.format(name))
+
+        r = self.do_post('/link/create', data={
+            "name": name,
+            "address": address or None,
+            "mtu": int(mtu),
+            "keepalive": int(keepalive),
+        })
+        return r.json()

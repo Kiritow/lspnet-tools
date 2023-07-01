@@ -247,6 +247,10 @@ class NetworkConfigParser:
         # Key manager
         if self.key_manager:
             cloud_keys = self.key_manager.list_keys()
+            cloud_links = self.key_manager.list_links()
+        else:
+            cloud_keys = {}
+            cloud_links = {}
 
         # Interfaces
         network_config = root_config['networks']
@@ -293,6 +297,15 @@ class NetworkConfigParser:
             if self.key_manager:
                 if interface_name not in cloud_keys or cloud_keys[interface_name] != wg_config['public']:
                     self.key_manager.patch_key(interface_name, wg_config['public'])
+                if interface_name in cloud_links:
+                    logger.info('patching interface {} with cloud link: {}'.format(interface_name, json.dumps(cloud_links[interface_name])))
+                    new_interface.address = cloud_links[interface_name]["address"]
+                    if int(cloud_links[interface_name]["mtu"]) != 0:
+                        new_interface.mtu = int(cloud_links[interface_name]["mtu"])
+                    if int(cloud_links[interface_name]["keepalive"]) != 0:
+                        new_interface.keepalive = int(cloud_links[interface_name]["keepalive"])
+                else:
+                    self.key_manager.create_link(interface_name, new_interface.address, new_interface.mtu, new_interface.keepalive)
 
             # Connector
             new_connector = None
@@ -333,7 +346,7 @@ class NetworkConfigParser:
             new_interface.connector = new_connector
 
             self.interfaces[new_interface.name] = new_interface
-        
+
         # Key Manager
         if self.key_manager:
             for interface_name, interface_config in network_config.items():
