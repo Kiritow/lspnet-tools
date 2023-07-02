@@ -293,15 +293,16 @@ class NetworkConfigParser:
             if self.key_manager:
                 if interface_name not in cloud_keys or cloud_keys[interface_name] != wg_config['public']:
                     self.key_manager.patch_key(interface_name, wg_config['public'])
-                if interface_name in cloud_links:
-                    logger.info('patching interface {} with cloud link: {}'.format(interface_name, json.dumps(cloud_links[interface_name])))
-                    new_interface.address = cloud_links[interface_name]["address"]
-                    if int(cloud_links[interface_name]["mtu"]) != 0:
-                        new_interface.mtu = int(cloud_links[interface_name]["mtu"])
-                    if int(cloud_links[interface_name]["keepalive"]) != 0:
-                        new_interface.keepalive = int(cloud_links[interface_name]["keepalive"])
-                else:
-                    self.key_manager.create_link(interface_name, new_interface.address, new_interface.mtu, new_interface.keepalive)
+
+                if interface_name not in cloud_links:
+                    cloud_links[interface_name] = self.key_manager.create_link(interface_name, new_interface.address, new_interface.mtu, new_interface.keepalive)
+
+                logger.info('patching interface {} with cloud link: {}'.format(interface_name, json.dumps(cloud_links[interface_name])))
+                new_interface.address = cloud_links[interface_name]["address"]
+                if int(cloud_links[interface_name]["mtu"]) != 0:
+                    new_interface.mtu = int(cloud_links[interface_name]["mtu"])
+                if int(cloud_links[interface_name]["keepalive"]) != 0:
+                    new_interface.keepalive = int(cloud_links[interface_name]["keepalive"])
 
             # Validation
             if not new_interface.validate():
