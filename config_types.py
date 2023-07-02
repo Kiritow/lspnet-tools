@@ -78,4 +78,7 @@ class InterfaceConfig:
         if self.autoconnect and not self.endpoint:
             logger.error('autoconnect cannot be enabled without endpoint specified!')
             return False
+        if not self.address:
+            logger.error('interface address should not be empty!')
+            return False
         return True

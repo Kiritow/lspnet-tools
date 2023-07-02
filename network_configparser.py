@@ -263,7 +263,7 @@ class NetworkConfigParser:
                 wg_config['private'],
                 wg_config['public'],
                 interface_config.get('mtu', 1420),
-                interface_config['address'],
+                interface_config.get('address', ''),
                 interface_config.get('listen', 0),
                 interface_config.get('peer', '') if self.key_manager else interface_config['peer'],
                 '0.0.0.0/0',
@@ -289,10 +289,6 @@ class NetworkConfigParser:
                     interface_config.get('bfd_multiplier', self.network_default_bfd_config.multiplier),
                 )
 
-            # Validation
-            if not new_interface.validate():
-                exit(1)
-
             # Key Manager
             if self.key_manager:
                 if interface_name not in cloud_keys or cloud_keys[interface_name] != wg_config['public']:
@@ -306,6 +302,10 @@ class NetworkConfigParser:
                         new_interface.keepalive = int(cloud_links[interface_name]["keepalive"])
                 else:
                     self.key_manager.create_link(interface_name, new_interface.address, new_interface.mtu, new_interface.keepalive)
+
+            # Validation
+            if not new_interface.validate():
+                exit(1)
 
             # Connector
             new_connector = None
@@ -354,7 +354,7 @@ class NetworkConfigParser:
                 if self.interfaces[interface_real_name].peer:
                     continue
 
-                retry_counter = 0 
+                retry_counter = 0
 
                 while True:
                     logger.info('requesting peer key for interface {}...{}'.format(interface_name, " (tried {} time{})".format(retry_counter, 's' if retry_counter > 1 else '') if retry_counter else ''))
