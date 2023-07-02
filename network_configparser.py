@@ -350,22 +350,25 @@ class NetworkConfigParser:
 
         # Key Manager
         if self.key_manager:
+            todo_keys = {}
             for interface_name, interface_config in network_config.items():
                 interface_real_name = "{}-{}".format(self.namespace, interface_name)
-                if self.interfaces[interface_real_name].peer:
-                    continue
+                if not self.interfaces[interface_real_name].peer:
+                    todo_keys[interface_name] = interface_real_name
 
-                retry_counter = 0
+            retry_counter = 0
 
-                while True:
-                    logger.info('requesting peer key for interface {}...{}'.format(interface_name, " (tried {} time{})".format(retry_counter, 's' if retry_counter > 1 else '') if retry_counter else ''))
-                    peer_key = self.key_manager.request_key(interface_name)
-                    if peer_key:
-                        logger.info('got peer key: {}'.format(peer_key))
-                        self.interfaces[interface_real_name].peer = peer_key
-                        break
-                    time.sleep(1)
-                    retry_counter += 1
+            while True:
+                real_todo_keys = list(todo_keys.keys())
+                logger.info('requesting peer key for interface {}...{}'.format(','.join(real_todo_keys), " (tried {} time{})".format(retry_counter, 's' if retry_counter > 1 else '') if retry_counter else ''))
+                result_keys = self.key_manager.batch_request_key(real_todo_keys)
+                for interface_name in result_keys:
+                    self.interfaces[todo_keys[interface_name]].peer = result_keys[interface_name]
+                    todo_keys.pop(interface_name)
+                if not todo_keys:
+                    break
+                time.sleep(1)
+                retry_counter += 1
 
         # BIRD config
         interface_cidrs = [str(ipaddress.ip_interface(interface_item.address).network) for interface_item in self.interfaces.values() if interface_item.enable_ospf]

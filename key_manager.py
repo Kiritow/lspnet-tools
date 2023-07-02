@@ -59,6 +59,18 @@ class KeyManager:
             return r.json()["key"]
         return ""
 
+    def batch_request_key(self, host_arr):
+        logger.info('[KeyManager] requesting keys {}...'.format(host_arr))
+        r = self.do_post('/wg/batch_request', data=[{
+            "host": host,
+        } for host in host_arr])
+        status_arr = r.json()
+        result_keys = {}
+        for status_info in status_arr:
+            if status_info["status"] == "ready":
+                result_keys[status_info["host"]] = status_info["key"]
+        return result_keys
+
     def list_keys(self):
         logger.info('[KeyManager] fetching keys...')
 
