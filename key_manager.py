@@ -101,3 +101,13 @@ class KeyManager:
             "keepalive": int(keepalive),
         })
         return r.json()
+
+    def report_stat(self, name, ping, rx, tx):
+        logger.info('[KeyManager] send metric for link {}...'.format(name))
+        
+        self.do_post('/link/report', data={
+            "name": name,
+            "ping": ping,
+            "rx": rx,
+            "tx": tx,
+        })

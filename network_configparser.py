@@ -57,27 +57,32 @@ def load_or_create_keys(namespace, name):
         return data
 
 
-def load_or_login_manager(domain, network, hostname):
+def load_key_manager(domain, network, hostname):
     try:
         with open('local/{}.{}.token'.format(network, hostname)) as f:
             token = f.read()
         m = KeyManager(domain, token)
         if not m.validate():
             logger.warn('invalid or expired token found.')
-            token = ''
-    except FileNotFoundError:
-        token = ''
+            return None
 
-    if token != '':
         return token
-    
+    except FileNotFoundError:
+        return None
+
+
+def load_or_login_manager(domain, network, hostname):
+    token = load_key_manager(domain, network, hostname)
+    if token:
+        return token
+
     m = KeyManager(domain)
     passwd = getpass('[Managed by {}] Password for network `{}`: '.format(domain, network))
     m.login(network, hostname, passwd)
-    
+
     with open('local/{}.{}.token'.format(network, hostname), 'w') as f:
         f.write(m.token)
-    
+
     return m.token
 
 
@@ -235,6 +240,7 @@ class NetworkConfigParser:
             network_config.get('bfd_idle', 0),
             network_config.get('bfd_multiplier', 0),
         )
+        self.network_default_enable_report = network_config.get('report', False)
 
         # Firewall
         firewall_config = root_config.get('firewall', {})
@@ -259,6 +265,7 @@ class NetworkConfigParser:
         for interface_name, interface_config in network_config.items():
             wg_config = load_or_create_keys(self.namespace, interface_name)
             new_interface = InterfaceConfig(
+                interface_name,
                 "{}-{}".format(self.namespace, interface_name),
                 wg_config['private'],
                 wg_config['public'],
@@ -269,7 +276,7 @@ class NetworkConfigParser:
                 '0.0.0.0/0',
                 interface_config.get('endpoint', ''),
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),
-                interface_config.get('autoconnect', False),
+                interface_config.get('autoconnect', False)
             )
             new_interface.enable_ospf = interface_config.get('ospf', self.network_default_enable_ospf)
             if new_interface.enable_ospf:
@@ -288,6 +295,7 @@ class NetworkConfigParser:
                     interface_config.get('bfd_idle', self.network_default_bfd_config.idleMs),
                     interface_config.get('bfd_multiplier', self.network_default_bfd_config.multiplier),
                 )
+            new_interface.enable_report = interface_config.get('report', self.network_default_enable_report)
 
             # Key Manager
             if self.key_manager:
@@ -306,6 +314,9 @@ class NetworkConfigParser:
 
             # Validation
             if not new_interface.validate():
+                exit(1)
+            if not self.key_manager and new_interface.enable_report:
+                logger.error('cannot enable reporter without key manager')
                 exit(1)
 
             # Connector

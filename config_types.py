@@ -57,6 +57,7 @@ class NetworkMappingConfig:
 
 @dataclass
 class InterfaceConfig:
+    short_name: str = ''
     name: str = ''
     private: str = ''
     public: str = ''
@@ -72,6 +73,7 @@ class InterfaceConfig:
     ospf_config: CommonOSPFConfig = None
     enable_bfd: bool = False
     bfd_config: BFDConfig = None
+    enable_report: bool = False
     connector: Union[ConnectorPhantunClientConfig, ConnectorPhantunClientConfig] = None
 
     def validate(self):

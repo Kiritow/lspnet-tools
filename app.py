@@ -254,6 +254,22 @@ def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkM
     try_append_iptables_rule("raw", f"{namespace}-PREROUTING", ["-i", eth_name, "-s", config_item.to_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number + 1)])
 
 
+def start_link_reporter(unit_prefix, install_dir, namespace, domain, network, host, interface_item: InterfaceConfig):
+    script_path = os.path.join(install_dir, 'reporter.py')
+    
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
+               "--on-calendar", "*-*-* *:*:00",
+               "--property", "RuntimeMaxSec=30",
+               "-E", "REPORT_DOMAIN={}".format(domain),
+               "-E", "REPORT_NETWORK={}".format(network),
+               "-E", "REPORT_HOSTNAME={}".format(host),
+               "-E", "REPORT_INTERFACE={}".format(interface_item.short_name),
+               "-E", "REPORT_IP={}".format(),
+               "-E", "REPORT_NAMESPACE={}".format(namespace),
+               "python3", script_path,
+               ])
+
+
 def inspect_podman_router(namespace):
     container_name = "{}-router".format(namespace)
 
@@ -320,6 +336,10 @@ def config_up(parser: NetworkConfigParser):
             try_append_iptables_rule("filter", f"{parser.namespace}-INPUT", ["-p", "udp", "--dport", str(interface_item.listen), "-j", "ACCEPT"])
 
         patch_wg_config(parser.namespace, interface_name, interface_item)
+
+        # Cloud Report
+        if interface_item.enable_report:
+            start_link_reporter(task_prefix, INSTALL_DIR, parser.namespace, parser.manager_domain, parser.managed_network, parser.hostname, interface_item)
 
         # Connector
         if interface_item.connector:
