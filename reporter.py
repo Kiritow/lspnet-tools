@@ -44,10 +44,10 @@ def get_peer_ip(network_namespace, interface_name):
         content = subprocess.check_output(nsexec_wrap(network_namespace, ["ip", "-j", "address", "show", "dev", interface_name]))
         content = json.loads(content)
         ipnet = ipaddress.ip_interface("{}/{}".format(content[0]['addr_info'][0]['local'], content[0]['addr_info'][0]['prefixlen'])).network
-        if ipnet[0] == content[0]['addr_info'][0]['local']:
-            return str(ipnet[1])
+        if ipnet[1] == content[0]['addr_info'][0]['local']:
+            return str(ipnet[2])
         else:
-            return str(ipnet[0])
+            return str(ipnet[1])
     except Exception:
         print(traceback.format_exc())
         return ''
