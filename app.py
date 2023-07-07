@@ -260,10 +260,12 @@ def start_link_reporter(unit_prefix, install_dir, namespace, domain, network, ho
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
                "--on-calendar", "*-*-* *:*:00",
                "--property", "RuntimeMaxSec=30",
+               "--property", "WorkingDirectory={}".format(install_dir),
                "-E", "REPORT_DOMAIN={}".format(domain),
                "-E", "REPORT_NETWORK={}".format(network),
                "-E", "REPORT_HOSTNAME={}".format(host),
                "-E", "REPORT_INTERFACE={}".format(interface_item.short_name),
+               "-E", "REPORT_INTERFACE_REAL={}".format(interface_item.name),
                "-E", "REPORT_NAMESPACE={}".format(namespace),
                "python3", script_path,
                ])

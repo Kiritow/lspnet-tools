@@ -66,15 +66,16 @@ if __name__ == "__main__":
     REPORT_NETWORK = os.getenv('REPORT_NETWORK')
     REPORT_HOSTNAME = os.getenv('REPORT_HOSTNAME')
     REPORT_INTERFACE = os.getenv('REPORT_INTERFACE')
+    REPORT_INTERFACE_REAL = os.getenv('REPORT_INTERFACE_REAL')
     REPORT_IP = os.getenv('REPORT_IP') or ''
     REPORT_NAMESPACE = os.getenv('REPORT_NAMESPACE') or ''
 
-    if not REPORT_DOMAIN or not REPORT_NETWORK or not REPORT_HOSTNAME or not REPORT_INTERFACE:
+    if not REPORT_DOMAIN or not REPORT_NETWORK or not REPORT_HOSTNAME or not REPORT_INTERFACE or not REPORT_INTERFACE_REAL:
         print('missing env vars')
         exit(1)
     
     if not REPORT_IP:
-        REPORT_IP = get_peer_ip(REPORT_NAMESPACE, REPORT_INTERFACE)
+        REPORT_IP = get_peer_ip(REPORT_NAMESPACE, REPORT_INTERFACE_REAL)
         print('using REPORT_IP={}'.format(REPORT_IP))
 
     token = load_key_manager(REPORT_DOMAIN, REPORT_NETWORK, REPORT_HOSTNAME)
@@ -87,6 +88,6 @@ if __name__ == "__main__":
     if ping_us < 0:
         ping_us = None
 
-    rx, tx = get_wg_rxtx(REPORT_NAMESPACE, REPORT_INTERFACE)
+    rx, tx = get_wg_rxtx(REPORT_NAMESPACE, REPORT_INTERFACE_REAL)
 
     m.report_stat(REPORT_INTERFACE, ping_us, rx, tx)
