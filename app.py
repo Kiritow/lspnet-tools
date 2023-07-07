@@ -264,7 +264,6 @@ def start_link_reporter(unit_prefix, install_dir, namespace, domain, network, ho
                "-E", "REPORT_NETWORK={}".format(network),
                "-E", "REPORT_HOSTNAME={}".format(host),
                "-E", "REPORT_INTERFACE={}".format(interface_item.short_name),
-               "-E", "REPORT_IP={}".format(),
                "-E", "REPORT_NAMESPACE={}".format(namespace),
                "python3", script_path,
                ])

@@ -4,6 +4,8 @@ import subprocess
 import os
 import traceback
 import time
+import json
+import ipaddress
 
 
 def nsexec_wrap(namespace, call_args):
@@ -37,6 +39,20 @@ def check_direct_ping(network_namespace, target_ip, ping_count=10):
         return -1
 
 
+def get_peer_ip(network_namespace, interface_name):
+    try:
+        content = subprocess.check_output(nsexec_wrap(network_namespace, ["ip", "-j", "address", "show", "dev", interface_name]))
+        content = json.loads(content)
+        ipnet = ipaddress.ip_interface("{}/{}".format(content[0]['addr_info'][0]['local'], content[0]['addr_info'][0]['prefixlen'])).network
+        if ipnet[0] == content[0]['addr_info'][0]['local']:
+            return str(ipnet[1])
+        else:
+            return str(ipnet[0])
+    except Exception:
+        print(traceback.format_exc())
+        return ''
+
+
 def get_wg_rxtx(network_namespace, device_name):
     output = subprocess.check_output(nsexec_wrap(network_namespace, ["wg", "show", device_name, "dump"]), encoding='utf-8').split('\n')
     line = output[1]
@@ -50,12 +66,16 @@ if __name__ == "__main__":
     REPORT_NETWORK = os.getenv('REPORT_NETWORK')
     REPORT_HOSTNAME = os.getenv('REPORT_HOSTNAME')
     REPORT_INTERFACE = os.getenv('REPORT_INTERFACE')
-    REPORT_IP = os.getenv('REPORT_IP')
+    REPORT_IP = os.getenv('REPORT_IP') or ''
     REPORT_NAMESPACE = os.getenv('REPORT_NAMESPACE') or ''
-    
-    if not REPORT_DOMAIN or not REPORT_NETWORK or not REPORT_HOSTNAME or not REPORT_INTERFACE or not REPORT_IP:
+
+    if not REPORT_DOMAIN or not REPORT_NETWORK or not REPORT_HOSTNAME or not REPORT_INTERFACE:
         print('missing env vars')
         exit(1)
+    
+    if not REPORT_IP:
+        REPORT_IP = get_peer_ip(REPORT_NAMESPACE, REPORT_INTERFACE)
+        print('using REPORT_IP={}'.format(REPORT_IP))
 
     token = load_key_manager(REPORT_DOMAIN, REPORT_NETWORK, REPORT_HOSTNAME)
     if not token:
