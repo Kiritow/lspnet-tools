@@ -254,16 +254,14 @@ def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkM
     try_append_iptables_rule("raw", f"{namespace}-PREROUTING", ["-i", eth_name, "-s", config_item.to_addr, "-j", "NFQUEUE", "--queue-num", str(config_item.queue_number + 1)])
 
 
-def start_link_reporter(unit_prefix, install_dir, namespace, domain, network, host, interface_item: InterfaceConfig):
+def start_link_reporter(unit_prefix, install_dir, namespace, domain, report_token, interface_item: InterfaceConfig):
     script_path = os.path.join(install_dir, 'reporter.py')
     
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
                "--on-calendar", "*-*-* *:*:00",
                "--property", "RuntimeMaxSec=30",
-               "--property", "WorkingDirectory={}".format(install_dir),
                "-E", "REPORT_DOMAIN={}".format(domain),
-               "-E", "REPORT_NETWORK={}".format(network),
-               "-E", "REPORT_HOSTNAME={}".format(host),
+               "-E", "REPORT_TOKEN={}".format(report_token),
                "-E", "REPORT_INTERFACE={}".format(interface_item.short_name),
                "-E", "REPORT_INTERFACE_REAL={}".format(interface_item.name),
                "-E", "REPORT_NAMESPACE={}".format(namespace),
@@ -340,7 +338,7 @@ def config_up(parser: NetworkConfigParser):
 
         # Cloud Report
         if interface_item.enable_report:
-            start_link_reporter(task_prefix, INSTALL_DIR, parser.namespace, parser.manager_domain, parser.managed_network, parser.hostname, interface_item)
+            start_link_reporter(task_prefix, INSTALL_DIR, parser.namespace, parser.manager_domain, parser.report_token, interface_item)
 
         # Connector
         if interface_item.connector:

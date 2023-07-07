@@ -195,6 +195,7 @@ class NetworkConfigParser:
         if self.manager_domain:
             self.managed_network = root_config.get('network', self.namespace)
             self.key_manager = KeyManager(self.manager_domain, load_or_login_manager(self.manager_domain, self.managed_network, self.hostname))
+            self.report_token = self.key_manager.get_report_token()
         else:
             self.key_manager = None
 

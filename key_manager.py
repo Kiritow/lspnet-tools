@@ -48,6 +48,12 @@ class KeyManager:
 
         return r.json()
 
+    def get_report_token(self):
+        logger.info('[KeyManager] requesting new report token...')
+        
+        r = self.do_post('/report_token')
+        return r.content.decode()
+
     def request_key(self, host):
         logger.info('[KeyManager] requesting key {}...'.format(host))
 
