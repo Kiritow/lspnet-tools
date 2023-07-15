@@ -432,7 +432,7 @@ def config_down(parser: NetworkConfigParser):
     if parser.enable_local_network and parser.local_connect_namespaces:
         for connect_config in parser.local_connect_namespaces:
             interface_name = 'veth-{}'.format(connect_config.namespace)
-            destroy_device_if_exists(connect_config.namespace, interface_name)
+            destroy_device_if_exists(parser.namespace, interface_name)
 
     # Stop bird container
     shutdown_podman_router(parser.namespace)
