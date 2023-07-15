@@ -125,6 +125,26 @@ def create_veth_device(namespace, name, veth_network):
     sudo_call(["ip", "-n", namespace, "link", "set", "dev", peer_name, "up"])
 
 
+def create_ns_connect(current_namespace, remote_namespace, veth_network):
+    current_dev = "veth-{}".format(current_namespace)
+    remote_dev = "veth-{}".format(remote_namespace)
+
+    sudo_call(["ip", "link", "add", current_dev, "type", "veth", "peer", remote_dev])
+    sudo_call(["ip", "link", "set", "dev", current_dev, "netns", remote_namespace])
+    sudo_call(["ip", "link", "set", "dev", remote_dev, "netns", current_namespace])
+
+    vnetwork = ipaddress.ip_network(veth_network)
+    vaddrs = list(vnetwork.hosts())
+    current_addr = "{}/{}".format(vaddrs[0], vnetwork.prefixlen)
+    remote_addr = "{}/{}".format(vaddrs[1], vnetwork.prefixlen)
+
+    sudo_call(["ip", "-n", current_namespace, "address", "add", "dev", remote_dev, remote_addr])
+    sudo_call(["ip", "-n", remote_namespace, "address", "add", "dev", current_dev, current_addr])
+
+    sudo_call(["ip", "-n", current_namespace, "link", "set", "dev", remote_dev, "up"])
+    sudo_call(["ip", "-n", remote_namespace, "link", "set", "dev", current_dev, "up"])
+
+
 def try_create_iptables_chain(table_name, chain_name):
     try:
         subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-N", chain_name]), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
@@ -321,6 +341,11 @@ def config_up(parser: NetworkConfigParser):
     if parser.enable_local_network and parser.local_network_mapping:
         for mapping_config_item in parser.local_network_mapping:
             start_nfq_workers(task_prefix, INSTALL_DIR, parser.namespace, mapping_config_item, parser.local_interface.name)
+    
+    # Namespace Connect
+    if parser.enable_local_network and parser.local_connect_namespaces:
+        for connect_config in parser.local_connect_namespaces:
+            create_ns_connect(parser.namespace, connect_config.namespace, connect_config.network)
 
     # PMTU fix
     sudo_call(["ip", "netns", "exec", parser.namespace, "iptables", "-A", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"])

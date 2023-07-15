@@ -8,7 +8,7 @@ import traceback
 from typing import Dict
 from getpass import getpass
 
-from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig
+from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig
 from get_logger import get_logger
 from key_manager import KeyManager
 
@@ -86,7 +86,7 @@ def load_or_login_manager(domain, network, hostname):
     return m.token
 
 
-def get_bird_config(router_id, direct_interface_names, ospf_exclude_import_cidrs, ospf_exclude_export_cidrs, ospf_area_config, bfd_config):
+def get_bird_config(router_id, direct_interface_names, ospf_exclude_import_cidrs, ospf_exclude_export_cidrs, ospf_area_config: Dict[str, Dict[str, CommonOSPFConfig]], bfd_config):
     current_time_text = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     router_id_text = 'router id {};'.format(router_id) if router_id else ''
@@ -224,6 +224,11 @@ class NetworkConfigParser:
                 NetworkMappingConfig(data['from'], data['to'], data['num'], data.get('size', 1024))
                 for data in local_mapping_config
             ]
+            local_connect_config = local_config.get('connect', [])
+            self.local_connect_namespaces = []
+            for connect_config in local_connect_config:
+                new_connect_config = NamespaceConnectConfig(connect_config["namespace"], connect_config["network"])
+                self.local_connect_namespaces.append(new_connect_config)
 
         network_config = root_config['config']
         self.network_default_enable_ospf = network_config.get('ospf', False)
@@ -411,5 +416,10 @@ class NetworkConfigParser:
                 ospf_area_config[self.local_interface.ospf_config.area] = {}
 
             ospf_area_config[self.local_interface.ospf_config.area]["{}1".format(self.local_veth_prefix)] = self.local_interface.ospf_config
+
+        # Accept local connect
+        if self.enable_local_network:
+            temp_ospf_config = CommonOSPFConfig(0, 1, '', 'ptp')
+            ospf_area_config[temp_ospf_config.area]["veth-*"] = temp_ospf_config
 
         self.network_bird_config = get_bird_config('', [], interface_cidrs, [], ospf_area_config, bfd_config)

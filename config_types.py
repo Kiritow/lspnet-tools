@@ -7,6 +7,12 @@ logger = get_logger('app')
 
 
 @dataclass
+class NamespaceConnectConfig:
+    namespace: str
+    network: str
+
+
+@dataclass
 class CommonOSPFConfig:
     area: int = 0
     cost: int = 0
