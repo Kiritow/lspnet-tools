@@ -34,6 +34,12 @@ def sudo_wrap(args):
     return args
 
 
+def ns_wrap(namespace, args):
+    if namespace:
+        return ["ip", "netns", "exec", namespace] + args
+    return args
+
+
 def sudo_call(args):
     return subprocess.check_call(sudo_wrap(args))
 
@@ -125,7 +131,20 @@ def create_veth_device(namespace, name, veth_network):
     sudo_call(["ip", "-n", namespace, "link", "set", "dev", peer_name, "up"])
 
 
+def destroy_device_if_exists(namespace, interface_name):
+    result = sudo_call_output(ns_wrap(namespace, ["ip", "-j", "link"]))
+    print(result)
+    result = json.loads(result)
+
+    for if_config in result:
+        if if_config['ifname'] == interface_name:
+            # Found interface, remove it
+            sudo_call(ns_wrap(namespace, ["ip", "link", "del", "dev", interface_name]))
+
+
 def create_ns_connect(current_namespace, remote_namespace, veth_network):
+    ensure_netns(remote_namespace)
+
     current_dev = "veth-{}".format(current_namespace)
     remote_dev = "veth-{}".format(remote_namespace)
 
@@ -404,16 +423,16 @@ def config_down(parser: NetworkConfigParser):
     clear_iptables(parser.namespace)
 
     for interface_name in parser.interfaces:
-        result = sudo_call_output(["ip", "-j", "-n", parser.namespace, "link"])
-        print(result)
-        result = json.loads(result)
-        for if_config in result:
-            if if_config['ifname'] == interface_name:
-                # Found interface, remove it
-                sudo_call(["ip", "-n", parser.namespace, "link", "del", "dev", interface_name])
+        destroy_device_if_exists(parser.namespace, interface_name)
 
     if parser.enable_local_network and parser.enable_veth_link:
-        sudo_call(["ip", "link", "del", "dev", "{}0".format(parser.local_veth_prefix)])
+        destroy_device_if_exists('', "{}0".format(parser.local_veth_prefix))
+
+    # Namespace Connect
+    if parser.enable_local_network and parser.local_connect_namespaces:
+        for connect_config in parser.local_connect_namespaces:
+            interface_name = 'veth-{}'.format(connect_config.namespace)
+            destroy_device_if_exists(connect_config.namespace, interface_name)
 
     # Stop bird container
     shutdown_podman_router(parser.namespace)
