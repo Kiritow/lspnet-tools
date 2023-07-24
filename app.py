@@ -297,6 +297,8 @@ def start_link_reporter(unit_prefix, install_dir, namespace, domain, report_toke
     script_path = os.path.join(install_dir, 'reporter.py')
     
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
+               "--timer-property", "AccuracySec=10",
+               "--timer-property", "RandomizedDelaySec=3",
                "--on-calendar", "*-*-* *:*:00",
                "--property", "RuntimeMaxSec=30",
                "-E", "REPORT_DOMAIN={}".format(domain),
