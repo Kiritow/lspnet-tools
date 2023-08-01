@@ -1,4 +1,3 @@
-from network_configparser import load_key_manager
 from key_manager import KeyManager
 import subprocess
 import os
@@ -74,15 +73,10 @@ if __name__ == "__main__":
     if not REPORT_DOMAIN or not REPORT_TOKEN or not REPORT_INTERFACE or not REPORT_INTERFACE_REAL:
         print('missing env vars')
         exit(1)
-    
+
     if not REPORT_IP:
         REPORT_IP = get_peer_ip(REPORT_NAMESPACE, REPORT_INTERFACE_REAL)
         print('using REPORT_IP={}'.format(REPORT_IP))
-
-    m = KeyManager(REPORT_DOMAIN, REPORT_TOKEN)
-    if not m.validate():
-        print('token invalid or expired.')
-        exit(1)
 
     ping_us = check_direct_ping(REPORT_NAMESPACE, REPORT_IP)
     if ping_us < 0:
@@ -90,4 +84,5 @@ if __name__ == "__main__":
 
     rx, tx = get_wg_rxtx(REPORT_NAMESPACE, REPORT_INTERFACE_REAL)
 
+    m = KeyManager(REPORT_DOMAIN, REPORT_TOKEN)
     m.report_stat(REPORT_INTERFACE, ping_us, rx, tx)
