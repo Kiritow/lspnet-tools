@@ -362,7 +362,7 @@ def config_up(parser: NetworkConfigParser):
     if parser.enable_local_network and parser.local_network_mapping:
         for mapping_config_item in parser.local_network_mapping:
             start_nfq_workers(task_prefix, INSTALL_DIR, parser.namespace, mapping_config_item, parser.local_interface.name)
-    
+
     # Namespace Connect
     if parser.enable_local_network and parser.local_connect_namespaces:
         for connect_config in parser.local_connect_namespaces:
