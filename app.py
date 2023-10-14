@@ -17,6 +17,7 @@ import os
 import ipaddress
 import socket
 import uuid
+import time
 from prettytable import PrettyTable
 from network_configparser import NetworkConfigParser
 from network_configparser import create_new_wireguard_keys
@@ -524,7 +525,7 @@ def dump_wireguard_state(namespace):
                 "peers": {},
             }
         else:
-            interface_states[parts[0]][parts[1]] = {
+            interface_states[parts[0]]["peers"][parts[1]] = {
                 "preshared": '' if parts[2] == '(none)' else parts[2],
                 "endpoint": '' if parts[3] == '(none)' else parts[3],
                 "allow": parts[4],
@@ -534,6 +535,26 @@ def dump_wireguard_state(namespace):
                 "keepalive": 0 if parts[8] == 'off' else int(parts[8]),
             }
     return interface_states
+
+
+def human_readable_bytes(b):
+    if b < 1024:
+        return "{} B".format(b)
+    if b < 1024 * 1024:
+        return "{:.2f} KiB".format(b / 1024)
+    if b < 1024 * 1024 * 1024:
+        return "{:.2f} MiB".format(b / 1024 / 1024)
+
+    return "{:.2f} GiB".format(b / 1024 / 1024 / 1024)
+
+
+def human_readable_duration(s):
+    if s < 60:
+        return "{}s".format(s)
+    if s < 60 * 60:
+        return "{}m{}s".format(int(s / 60), s % 60)
+
+    return "{}h{}m{}s".format(int(s / 3600), int((s % 3600) / 60), s % 60)
 
 
 def show_network_status(parser: NetworkConfigParser):
@@ -546,7 +567,10 @@ def show_network_status(parser: NetworkConfigParser):
 
         interface_state = interface_states[interface_name]
         peer_state = list(interface_state["peers"].items())[0][1]
-        pt.add_row([interface_config.short_name, interface_name, interface_state['listen'], interface_state['rx'], interface_state['tx'], peer_state['endpoint'], peer_state['keepalive'], peer_state['handshake']])
+        pt.add_row([interface_config.short_name, interface_name, interface_state['listen'], 
+                    human_readable_bytes(peer_state['rx']), human_readable_bytes(peer_state['tx']),
+                    peer_state['endpoint'], peer_state['keepalive'] or "-",
+                    human_readable_duration(int(peer_state['handshake'] - time.time())) if peer_state['handshake'] else '-'])
 
     print(pt)
 
