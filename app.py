@@ -567,23 +567,18 @@ def show_network_status(parser: NetworkConfigParser):
 
         interface_state = interface_states[interface_name]
         peer_state = list(interface_state["peers"].items())[0][1]
-        
-        listen_status = ''
-        if interface_config.listen and interface_state['listen'] != interface_config.listen:
-            listen_status = '*'
 
         endpoint_status = ''
         if interface_config.endpoint:
-            if peer_state['endpoint'] and peer_state['endpoint'] != interface_config.endpoint:
+            if peer_state['endpoint'] != interface_config.endpoint:
                 endpoint_status = '!'
         else:
-            if peer_state['endpoint']:
-                endpoint_status = '*'
-        
+            endpoint_status = '*'
+
         pt.add_row([interface_config.short_name, interface_name,
-                    "{}{}".format(interface_state['listen'], listen_status),
+                    "{}{}".format(interface_state['listen'], '*' if interface_state['listen'] != interface_config.listen else ''),
                     human_readable_bytes(peer_state['rx']), human_readable_bytes(peer_state['tx']),
-                    "{}{}".format(peer_state['endpoint'], endpoint_status),
+                    "{}{}".format(peer_state['endpoint'], endpoint_status if peer_state['endpoint'] else ''),
                     human_readable_duration(peer_state['keepalive']) if peer_state['keepalive'] else "-",
                     human_readable_duration(int(time.time() - peer_state['handshake'])) if peer_state['handshake'] else '-'])
 
