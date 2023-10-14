@@ -560,6 +560,8 @@ def human_readable_duration(s):
 def show_network_status(parser: NetworkConfigParser):
     interface_states = dump_wireguard_state(parser.namespace)
     pt = PrettyTable(["Peer Name", "Interface Name", "Listen", "Recv", "Send", "Peer Address", "Keepalive", "Last Handshake"])
+    pt_data = []
+
     for interface_name, interface_config in parser.interfaces.items():
         if interface_name not in interface_states:
             pt.add_row([interface_config.short_name, "<unknown>"])
@@ -575,13 +577,15 @@ def show_network_status(parser: NetworkConfigParser):
         else:
             endpoint_status = '*'
 
-        pt.add_row([interface_config.short_name, interface_name,
+        pt_data.append([interface_config.short_name, interface_name,
                     "{}{}".format(interface_state['listen'], '*' if interface_state['listen'] != interface_config.listen else ''),
                     human_readable_bytes(peer_state['rx']), human_readable_bytes(peer_state['tx']),
-                    "{}{}".format(peer_state['endpoint'], endpoint_status if peer_state['endpoint'] else ''),
+                    "{}{}".format(peer_state['endpoint'] or '-', endpoint_status if peer_state['endpoint'] else ''),
                     human_readable_duration(peer_state['keepalive']) if peer_state['keepalive'] else "-",
                     human_readable_duration(int(time.time() - peer_state['handshake'])) if peer_state['handshake'] else '-'])
 
+    pt_data = sorted(pt_data, key=lambda x: x[0])
+    pt.add_rows(pt_data)
     print(pt)
 
 
