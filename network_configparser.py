@@ -8,7 +8,7 @@ import traceback
 from typing import Dict
 from getpass import getpass
 
-from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig
+from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig
 from get_logger import get_logger
 from key_manager import KeyManager
 
@@ -209,9 +209,18 @@ class NetworkConfigParser:
             self.local_is_exit_node = local_config.get('exit', True)
             self.local_veth_prefix = local_config.get('name', '{}-veth'.format(self.namespace))
 
+            self.enable_local_dummy = 'dummy' in local_config
+            if self.enable_local_dummy:
+                self.local_dummy_interface = DummyInterfaceConfig(
+                    local_config['dummy']['name'],
+                    local_config['dummy']['address'],
+                    local_config['dummy'].get('mtu', 1500),
+                )
+
             self.local_interface = InterfaceConfig()
             self.local_interface.address = local_config['address']
             self.local_interface.name = local_config['ethname']
+            # Local OSPF
             self.local_interface.enable_ospf = local_config.get('ospf', False)
             if self.local_interface.enable_ospf:
                 self.local_interface.ospf_config = CommonOSPFConfig(
@@ -220,10 +229,14 @@ class NetworkConfigParser:
                     local_config.get('auth', ''),
                     'ptp')
             local_mapping_config = local_config.get('mapping', [])
+            
+            # Local Network Mapping
             self.local_network_mapping = [
                 NetworkMappingConfig(data['from'], data['to'], data['num'], data.get('size', 1024))
                 for data in local_mapping_config
             ]
+            
+            # Network namespace interconnect
             local_connect_config = local_config.get('connect', [])
             self.local_connect_namespaces = []
             for connect_config in local_connect_config:

@@ -131,6 +131,12 @@ def create_veth_device(namespace, name, veth_network):
     sudo_call(["ip", "-n", namespace, "link", "set", "dev", peer_name, "up"])
 
 
+def create_dummy_device(name, address, mtu):
+    sudo_call(["ip", "link", "add", name, "type", "dummy"])
+    sudo_call(["ip", "address", "add", "dev", name, address])
+    sudo_call(["ip", "link", "set", "dev", name, "up"])
+
+
 def destroy_device_if_exists(namespace, interface_name):
     result = sudo_call_output(ns_wrap(namespace, ["ip", "-j", "link"]))
     print(result)
@@ -345,11 +351,18 @@ def config_up(parser: NetworkConfigParser):
     ensure_ip_forward(parser.namespace)
 
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
+    
+    if parser.enable_local_dummy:
+        create_dummy_device(parser.local_dummy_interface.name, parser.local_dummy_interface.address, parser.local_dummy_interface.mtu)
 
     if parser.enable_local_network and parser.enable_veth_link:
         create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_interface.address)
         try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "-d", parser.local_interface.address, "-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
-        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
+        if parser.enable_local_dummy:
+            snat_ip = parser.local_dummy_interface.get_first_address()
+        else:
+            snat_ip = get_eth_ip(parser.local_interface.name)
+        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", snat_ip])
         try_append_iptables_rule("filter", f"{parser.namespace}-FORWARD", ["-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
 
     if parser.enable_local_network and parser.local_is_exit_node:
@@ -429,6 +442,9 @@ def config_down(parser: NetworkConfigParser):
 
     if parser.enable_local_network and parser.enable_veth_link:
         destroy_device_if_exists('', "{}0".format(parser.local_veth_prefix))
+        
+    if parser.enable_local_dummy:
+        destroy_device_if_exists('', parser.local_dummy_interface.name)
 
     # Namespace Connect
     if parser.enable_local_network and parser.local_connect_namespaces:
@@ -457,7 +473,7 @@ def config_update(parser: NetworkConfigParser):
         f.write(parser.network_bird_config)
 
     logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
-    
+
     # Update
     sudo_call(["mv", temp_filename, old_temp_filepath])
     sudo_call(["podman", "exec", container_inspect_result['Id'], "birdc", "configure"])

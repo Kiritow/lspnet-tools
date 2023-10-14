@@ -1,3 +1,4 @@
+import ipaddress
 from dataclasses import dataclass
 from typing import Union
 from get_logger import get_logger
@@ -10,6 +11,18 @@ logger = get_logger('app')
 class NamespaceConnectConfig:
     namespace: str
     network: str
+
+
+@dataclass
+class DummyInterfaceConfig:
+    name: str
+    address: str
+    mtu: int
+    
+    def get_first_address(self):
+        vnetwork = ipaddress.ip_network(self.address)
+        vaddrs = list(vnetwork.hosts())
+        return str(vaddrs[0])
 
 
 @dataclass

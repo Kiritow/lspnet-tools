@@ -18,6 +18,8 @@ exit = true  # act as exit node, default to true
 address = "172.16.0.0/30"  # veth link address, /30 subnet recommended. host will use the first available address.
 ethname = "eth0"  # nic card name of default gateway
 
+dummy = { name: "net0", address: "172.17.0.0/30" }  # dummy network
+
 ospf = false  # enable ospf on veth link, default to false
 # the following config is only required when ospf=true
 area = 0  # OSPF area ID
