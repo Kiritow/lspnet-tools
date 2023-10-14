@@ -31,6 +31,18 @@ except Exception:
         GIT_VERSION = "https://github.com/Kiritow/lspnet-tools"
 
 
+def create_new_wireguard_keys(namespace, name):
+    new_key = subprocess.check_output(["wg", "genkey"], encoding='utf-8').strip()
+    new_pub = subprocess.check_output(["wg", "pubkey"], encoding='utf-8', input=new_key).strip()
+    data = {
+        "private": new_key,
+        "public": new_pub,
+    }
+    with open('local/{}.{}.json'.format(namespace, name), 'w') as f:
+        f.write(json.dumps(data, ensure_ascii=False))
+    return data
+
+
 def load_or_create_keys(namespace, name):
     try:
         with open('local/{}.{}.json'.format(namespace, name)) as f:
@@ -46,15 +58,7 @@ def load_or_create_keys(namespace, name):
             "public": new_pub,
         }
     except FileNotFoundError:
-        new_key = subprocess.check_output(["wg", "genkey"], encoding='utf-8').strip()
-        new_pub = subprocess.check_output(["wg", "pubkey"], encoding='utf-8', input=new_key).strip()
-        data = {
-            "private": new_key,
-            "public": new_pub,
-        }
-        with open('local/{}.{}.json'.format(namespace, name), 'w') as f:
-            f.write(json.dumps(data, ensure_ascii=False))
-        return data
+        return create_new_wireguard_keys(namespace, name)
 
 
 def load_key_manager(domain, network, hostname):

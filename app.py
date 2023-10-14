@@ -17,7 +17,9 @@ import os
 import ipaddress
 import socket
 import uuid
+from prettytable import PrettyTable
 from network_configparser import NetworkConfigParser
+from network_configparser import create_new_wireguard_keys
 from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig
 from get_logger import get_logger
 
@@ -442,7 +444,7 @@ def config_down(parser: NetworkConfigParser):
 
     if parser.enable_local_network and parser.enable_veth_link:
         destroy_device_if_exists('', "{}0".format(parser.local_veth_prefix))
-        
+
     if parser.enable_local_dummy:
         destroy_device_if_exists('', parser.local_dummy_interface.name)
 
@@ -505,6 +507,50 @@ def import_wg_keys(parser: NetworkConfigParser, wg_conf_name):
         f.write(json.dumps(data, ensure_ascii=False))
 
 
+def dump_wireguard_state(namespace):
+    output = sudo_call_output(ns_wrap(namespace, ["wg", "show", "all", "dump"]))
+    interface_states = {}
+    for line in output.split('\n'):
+        if not line:
+            continue
+        parts = line.split('\t')
+        if parts[0] not in interface_states:
+            # new interface
+            interface_states[parts[0]] = {
+                "private": parts[1],
+                "public": parts[2],
+                "listen": int(parts[3]),
+                "fwmark": 0 if parts[4] == 'off' else int(parts[4]),
+                "peers": {},
+            }
+        else:
+            interface_states[parts[0]][parts[1]] = {
+                "preshared": '' if parts[2] == '(none)' else parts[2],
+                "endpoint": '' if parts[3] == '(none)' else parts[3],
+                "allow": parts[4],
+                "handshake": int(parts[5]),
+                "rx": int(parts[6]),
+                "tx": int(parts[7]),
+                "keepalive": 0 if parts[8] == 'off' else int(parts[8]),
+            }
+    return interface_states
+
+
+def show_network_status(parser: NetworkConfigParser):
+    interface_states = dump_wireguard_state(parser.namespace)
+    pt = PrettyTable(["Peer Name", "Interface Name", "Listen", "Recv", "Send", "Peer Address", "Keepalive", "Last Handshake"])
+    for interface_name, interface_config in parser.interfaces.items():
+        if interface_name not in interface_states:
+            pt.add_row([interface_config.short_name, "<unknown>"])
+            continue
+
+        interface_state = interface_states[interface_name]
+        peer_state = list(interface_state["peers"].items())[0][1]
+        pt.add_row([interface_config.short_name, interface_name, interface_state['listen'], interface_state['rx'], interface_state['tx'], peer_state['endpoint'], peer_state['keepalive'], peer_state['handshake']])
+
+    print(pt)
+
+
 if __name__ == "__main__":
     conf_file = sys.argv[1]
     action = sys.argv[2]
@@ -526,9 +572,20 @@ if __name__ == "__main__":
     elif action == 'import':
         interface_name = sys.argv[3]
         import_wg_keys(config_parser, interface_name)
+    elif action == 'rotate':
+        interface_name = sys.argv[3]
+        if interface_name == 'all':
+            for interface_name, interface_config in config_parser.interfaces.items():
+                logger.info('rotating keys for {}...'.format(interface_name))
+                create_new_wireguard_keys(config_parser.namespace, interface_name)
+        else:
+            logger.info('rotating keys for {}...'.format(interface_name))
+            create_new_wireguard_keys(config_parser.namespace, interface_name)
     elif action == 'list':
         for interface_name, interface_config in config_parser.interfaces.items():
             print("{}\t{}".format(interface_name, interface_config.public))
+    elif action == 'status':
+        show_network_status(config_parser)
     elif action == 'test':
         print(config_parser.network_bird_config)
     else:
