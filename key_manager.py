@@ -1,8 +1,22 @@
+import os
 import requests
 from get_logger import get_logger
 
 
 logger = get_logger('app')
+
+
+def get_proxies_from_env():
+    http_proxy = os.getenv('http_proxy') or os.getenv('HTTP_PROXY')
+    https_proxy = os.getenv('https_proxy') or os.getenv('HTTPS_PROXY')
+    if not http_proxy and not https_proxy:
+        return None
+
+    return {
+        "http": http_proxy,
+        "https": https_proxy,
+    }
+
 
 class KeyManager:
     def __init__(self, domain_prefix, token='') -> None:
@@ -17,7 +31,7 @@ class KeyManager:
             "host": host,
             "network": network,
             "token": password,
-        })
+        }, timeout=10, proxies=get_proxies_from_env())
         if r.status_code != 200:
             raise Exception('login failed, status: {}, error: {}'.format(r.status_code, r.content))
 
@@ -26,7 +40,7 @@ class KeyManager:
     def do_post(self, url, data=None, must_success=True):
         r = requests.post('{}{}'.format(self.domain_prefix, url), headers={
             'x-service-token': self.token,
-        }, json=data, timeout=10)
+        }, json=data, timeout=10, proxies=get_proxies_from_env())
         if must_success and r.status_code != 200:
             raise Exception('[POST] {}{} failed with status {}, error: {}'.format(self.domain_prefix, url, r.status_code, r.content))
         return r
@@ -34,7 +48,7 @@ class KeyManager:
     def do_get(self, url, params=None, must_success=True):
         r = requests.get('{}{}'.format(self.domain_prefix, url), headers={
             'x-service-token': self.token,
-        }, params=params, timeout=10)
+        }, params=params, timeout=10, proxies=get_proxies_from_env())
         if must_success and r.status_code != 200:
             raise Exception('[POST] {}{} failed with status {}, error: {}'.format(self.domain_prefix, url, r.status_code, r.content))
         return r
