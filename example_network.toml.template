@@ -62,7 +62,8 @@ address = "172.25.1.1/30"  # WireGuard interface address. /30 subnet recommended
 mtu = 1420  # MTU. default to 1420
 # listen = 51820  # WireGuard listen port. default to empty and WireGuard will automatically select one upon link is up.
 peer = '<WireGuard Peer Public Key>'
-# endpoint = '<WireGuard Peer Address>'
+# endpoint = '<WireGuard Peer Address>'  # domain name allowed
+# autorefresh = False  # Resolve endpoint domain name and update endpoint if mismatch
 # keepalive = 25  # wireguard keepalive seconds. default to 0.
 
 ospf = true  # enable OSPF on this link. default to [config.ospf]

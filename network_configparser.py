@@ -299,7 +299,7 @@ class NetworkConfigParser:
                 '0.0.0.0/0',
                 interface_config.get('endpoint', ''),
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),
-                interface_config.get('autoconnect', False)
+                interface_config.get('autorefresh', False)
             )
             new_interface.enable_ospf = interface_config.get('ospf', self.network_default_enable_ospf)
             if new_interface.enable_ospf:

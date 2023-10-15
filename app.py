@@ -91,7 +91,7 @@ def assign_wg_device(namespace, name, private_key, listen_port, peer, endpoint, 
             parts = endpoint.split(':')
             real_endpoint = socket.gethostbyname(parts[0])
             if real_endpoint != parts[0]:
-                logger.warning('endpoint {} resolve to {}, auto-refresh is not supported yet.'.format(parts[0], real_endpoint))
+                logger.info('endpoint {} resolved to {}'.format(parts[0], real_endpoint))
                 parts[0] = real_endpoint
                 real_endpoint = ':'.join(parts)
             else:
@@ -319,6 +319,21 @@ def start_link_reporter(unit_prefix, install_dir, namespace, domain, report_toke
                ])
 
 
+def start_endpoint_refresher(unit_prefix, install_dir, namespace, interface_item: InterfaceConfig):
+    script_path = os.path.join(install_dir, 'refresher.py')
+    
+    sudo_call(["systemd-run", "--unix", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
+               "--timer-property", "AccuracySec=10",
+               "--timer-property", "RandomizedDelaySec=3",
+               "--on-calendar", "*-*-* *:*:30",
+               "--property", "RuntimeMaxSec=15",
+               "-E", "NETWORK_NAMESPACE={}".format(namespace),
+               "-E", "INTERFACE_NAME={}".format(interface_item.name),
+               "-E", "ENDPOINT_ADDR={}".format(interface_item.endpoint),
+               "python3", script_path,
+               ])
+
+
 def inspect_podman_router(namespace):
     container_name = "{}-router".format(namespace)
 
@@ -401,6 +416,10 @@ def config_up(parser: NetworkConfigParser):
         # Cloud Report
         if interface_item.enable_report:
             start_link_reporter(task_prefix, INSTALL_DIR, parser.namespace, parser.manager_domain, parser.report_token, interface_item)
+        
+        # Auto Refresh
+        if interface_item.autorefresh:
+            start_endpoint_refresher(task_prefix, INSTALL_DIR, parser.namespace, interface_item)
 
         # Connector
         if interface_item.connector:
@@ -508,7 +527,7 @@ def import_wg_keys(parser: NetworkConfigParser, wg_conf_name):
         f.write(json.dumps(data, ensure_ascii=False))
 
 
-def dump_wireguard_state(namespace):
+def dump_all_wireguard_state(namespace):
     output = sudo_call_output(ns_wrap(namespace, ["wg", "show", "all", "dump"]))
     interface_states = {}
     for line in output.split('\n'):
@@ -558,7 +577,7 @@ def human_readable_duration(s):
 
 
 def show_network_status(parser: NetworkConfigParser):
-    interface_states = dump_wireguard_state(parser.namespace)
+    interface_states = dump_all_wireguard_state(parser.namespace)
     pt = PrettyTable(["Peer Name", "Interface Name", "Listen", "Recv", "Send", "Peer Address", "Keepalive", "Last Handshake"])
     pt_data = []
 

@@ -87,7 +87,7 @@ class InterfaceConfig:
     allowed: str = ''
     endpoint: str = ''
     keepalive: int = 0
-    autoconnect: bool = False
+    autorefresh: bool = False
     enable_ospf: bool = False
     ospf_config: CommonOSPFConfig = None
     enable_bfd: bool = False
@@ -96,8 +96,8 @@ class InterfaceConfig:
     connector: Union[ConnectorPhantunClientConfig, ConnectorPhantunClientConfig] = None
 
     def validate(self):
-        if self.autoconnect and not self.endpoint:
-            logger.error('autoconnect cannot be enabled without endpoint specified!')
+        if self.autorefresh and not self.endpoint:
+            logger.error('autorefresh cannot be enabled without endpoint specified!')
             return False
         if not self.address:
             logger.error('interface address should not be empty!')
