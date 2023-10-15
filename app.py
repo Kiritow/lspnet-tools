@@ -322,7 +322,7 @@ def start_link_reporter(unit_prefix, install_dir, namespace, domain, report_toke
 def start_endpoint_refresher(unit_prefix, install_dir, namespace, interface_item: InterfaceConfig):
     script_path = os.path.join(install_dir, 'refresher.py')
     
-    sudo_call(["systemd-run", "--unix", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
                "--timer-property", "AccuracySec=10",
                "--timer-property", "RandomizedDelaySec=3",
                "--on-calendar", "*-*-* *:*:30",
