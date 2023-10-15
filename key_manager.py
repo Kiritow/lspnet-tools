@@ -12,10 +12,12 @@ def get_proxies_from_env():
     if not http_proxy and not https_proxy:
         return None
 
-    return {
+    req_proxy = {
         "http": http_proxy,
         "https": https_proxy,
     }
+    logger.info('using proxy: {}'.format(req_proxy))
+    return req_proxy
 
 
 class KeyManager:
