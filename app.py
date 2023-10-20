@@ -610,23 +610,23 @@ def show_network_status(parser: NetworkConfigParser):
 
 
 if __name__ == "__main__":
-    args, _opts = getopt.getopt(sys.argv[1:], 'hc:', ['config=', 'offline', 'load-cache', 'update-cache'])
+    _opts, args = getopt.getopt(sys.argv[1:], 'hc:', ['config=', 'offline', 'load-cache', 'update-cache'])
     opts = {}
     for k, v in _opts:
         opts[k] = v
 
-    conf_file = opts.get('c') or opts.get('config') or os.getenv('CONFIG_FILE')
-    action = sys.argv[1]
-    
+    conf_file = opts.get('-c') or opts.get('--config') or os.getenv('CONFIG_FILE')
+    action = args[0]
+
     parser_opts = ParserOptions()
     if action == 'status':
         parser_opts.online_mode = False
 
-    if opts['offline']:
+    if '--offline' in opts:
         parser_opts.online_mode = False
-    if opts['load-cache']:
+    if '--load-cache' in opts:
         parser_opts.use_cahce = True
-    if opts['update-cache']:
+    if '--update-cache' in opts:
         parser_opts.use_cahce = True
 
     logger.info('using config file: {}'.format(conf_file))
