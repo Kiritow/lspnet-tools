@@ -307,7 +307,7 @@ class NetworkConfigParser:
                 interface_config.get('mtu', 1420),
                 interface_config.get('address', ''),
                 interface_config.get('listen', 0),
-                self.cache_manager.get('{}.peer'.format(interface_name), '') if self.cache_manager else interface_config.get('peer', '') if self.key_manager else interface_config['peer'],
+                interface_config.get('peer', '') if (self.key_manager or not parser_opts.online_mode) else interface_config['peer'],  # if managed or in offline mode, peer can be empty
                 '0.0.0.0/0',
                 interface_config.get('endpoint', ''),
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),
@@ -403,6 +403,9 @@ class NetworkConfigParser:
             todo_keys = {}
             for interface_name, interface_config in network_config.items():
                 interface_real_name = "{}-{}".format(self.namespace, interface_name)
+                # Cache Manager
+                if not self.interfaces[interface_real_name].peer and self.cache_manager:
+                    self.interfaces[interface_real_name].peer = self.cache_manager.get('{}.peer'.format(interface_name)) or ''
                 if not self.interfaces[interface_real_name].peer:
                     todo_keys[interface_name] = interface_real_name
 
