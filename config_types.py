@@ -111,3 +111,4 @@ class ParserOptions:
     use_cahce: bool = False
     save_cache: bool = False
     skip_error_validate: bool = False
+    skip_bird: bool = False

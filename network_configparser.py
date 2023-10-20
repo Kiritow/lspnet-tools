@@ -433,6 +433,9 @@ class NetworkConfigParser:
                     logger.error('max retry times exceeded')
                     exit(1)
 
+        if parser_opts.skip_bird:
+            return
+
         # BIRD config
         interface_cidrs = [str(ipaddress.ip_interface(interface_item.address).network) for interface_item in self.interfaces.values() if interface_item.enable_ospf]
         if self.enable_local_network and self.local_interface.enable_ospf:
