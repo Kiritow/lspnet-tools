@@ -29,8 +29,8 @@ class CacheManager:
         with open(self.cache_path, 'w') as f:
             f.write(content)
 
-    def get(self, key):
-        return self.cache.get(key)
+    def get(self, key, default=None):
+        return self.cache.get(key, default)
 
     def set(self, key, obj):
         if self.readonly:
