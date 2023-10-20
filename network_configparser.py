@@ -353,9 +353,11 @@ class NetworkConfigParser:
 
             # Validation
             if not new_interface.validate():
-                exit(1)
+                if not parser_opts.skip_error_validate:
+                    exit(1)
+
             if not self.key_manager and new_interface.enable_report and parser_opts.online_mode:
-                logger.error('cannot enable reporter without key manager')
+                logger.error('cannot enable reporter with unmanaged network')
                 exit(1)
 
             # Connector

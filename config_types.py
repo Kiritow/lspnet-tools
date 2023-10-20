@@ -110,3 +110,4 @@ class ParserOptions:
     online_mode: bool = True
     use_cahce: bool = False
     save_cache: bool = False
+    skip_error_validate: bool = False

@@ -621,6 +621,7 @@ if __name__ == "__main__":
     parser_opts = ParserOptions()
     if action == 'status':
         parser_opts.online_mode = False
+        parser_opts.skip_error_validate = True
 
     if '--offline' in opts:
         parser_opts.online_mode = False
