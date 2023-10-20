@@ -103,3 +103,10 @@ class InterfaceConfig:
             logger.error('interface address should not be empty!')
             return False
         return True
+
+
+@dataclass
+class ParserOptions:
+    online_mode: bool = True
+    use_cahce: bool = False
+    save_cache: bool = False
