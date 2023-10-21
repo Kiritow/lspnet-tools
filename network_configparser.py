@@ -8,9 +8,10 @@ import traceback
 from typing import Dict
 from getpass import getpass
 
-from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig
+from config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig, ParserOptions
 from get_logger import get_logger
 from key_manager import KeyManager
+from cache_manager import CacheManager
 
 logger = get_logger('app')
 
@@ -189,19 +190,25 @@ protocol ospf v2 wg {{
 
 
 class NetworkConfigParser:
-    def __init__(self, root_config):
+    def __init__(self, root_config, parser_opts: ParserOptions):
         self.hostname = root_config['hostname']
         self.namespace = root_config['namespace']
         self.ifname_prefix = root_config.get('prefix', self.hostname)
         self.router_id = root_config.get('routerid', '')
 
+        self.cache_manager : CacheManager = None
+        if parser_opts.use_cahce or parser_opts.save_cache:
+            self.cache_manager = CacheManager(readonly=not parser_opts.save_cache)
+
+        self.key_manager : KeyManager = None
+        self.report_token = ''
         self.manager_domain = root_config.get('manager')
         if self.manager_domain:
             self.managed_network = root_config.get('network', self.namespace)
-            self.key_manager = KeyManager(self.manager_domain, load_or_login_manager(self.manager_domain, self.managed_network, self.hostname))
-            self.report_token = self.key_manager.get_report_token()
-        else:
-            self.key_manager = None
+            if parser_opts.online_mode:
+                self.key_manager = KeyManager(self.manager_domain, load_or_login_manager(self.manager_domain, self.managed_network, self.hostname))
+            else:
+                logger.warning('offline mode detected, skip loading KeyManager')
 
         local_config = root_config.get('local', {})
         if not local_config:
@@ -233,13 +240,13 @@ class NetworkConfigParser:
                     local_config.get('auth', ''),
                     'ptp')
             local_mapping_config = local_config.get('mapping', [])
-            
+
             # Local Network Mapping
             self.local_network_mapping = [
                 NetworkMappingConfig(data['from'], data['to'], data['num'], data.get('size', 1024))
                 for data in local_mapping_config
             ]
-            
+
             # Network namespace interconnect
             local_connect_config = local_config.get('connect', [])
             self.local_connect_namespaces = []
@@ -274,12 +281,17 @@ class NetworkConfigParser:
             self.enable_local_firewall = True
 
         # Key manager
+        cloud_keys = {}
+        cloud_links = {}
+        if self.cache_manager:
+            cloud_keys = self.cache_manager.get('keys') or {}
+            cloud_links = self.cache_manager.get('links') or {}
         if self.key_manager:
             cloud_keys = self.key_manager.list_keys()
             cloud_links = self.key_manager.list_links()
-        else:
-            cloud_keys = {}
-            cloud_links = {}
+            if self.cache_manager:
+                self.cache_manager.set('keys', cloud_keys)
+                self.cache_manager.set('links', cloud_links)
 
         # Interfaces
         network_config = root_config['networks']
@@ -295,7 +307,7 @@ class NetworkConfigParser:
                 interface_config.get('mtu', 1420),
                 interface_config.get('address', ''),
                 interface_config.get('listen', 0),
-                interface_config.get('peer', '') if self.key_manager else interface_config['peer'],
+                interface_config.get('peer', '') if (self.key_manager or not parser_opts.online_mode) else interface_config['peer'],  # if managed or in offline mode, peer can be empty
                 '0.0.0.0/0',
                 interface_config.get('endpoint', ''),
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),
@@ -335,11 +347,17 @@ class NetworkConfigParser:
                 if int(cloud_links[interface_name]["keepalive"]) != 0:
                     new_interface.keepalive = int(cloud_links[interface_name]["keepalive"])
 
+                # Request report token
+                if new_interface.enable_report and not self.report_token:
+                    self.report_token = self.key_manager.get_report_token()
+
             # Validation
             if not new_interface.validate():
-                exit(1)
-            if not self.key_manager and new_interface.enable_report:
-                logger.error('cannot enable reporter without key manager')
+                if not parser_opts.skip_error_validate:
+                    exit(1)
+
+            if not self.key_manager and new_interface.enable_report and parser_opts.online_mode:
+                logger.error('cannot enable reporter with unmanaged network')
                 exit(1)
 
             # Connector
@@ -387,10 +405,14 @@ class NetworkConfigParser:
             todo_keys = {}
             for interface_name, interface_config in network_config.items():
                 interface_real_name = "{}-{}".format(self.namespace, interface_name)
+                # Cache Manager
+                if not self.interfaces[interface_real_name].peer and self.cache_manager:
+                    self.interfaces[interface_real_name].peer = self.cache_manager.get('{}.peer'.format(interface_name)) or ''
                 if not self.interfaces[interface_real_name].peer:
                     todo_keys[interface_name] = interface_real_name
 
             retry_counter = 0
+            max_retry_times = 60
 
             while True:
                 real_todo_keys = list(todo_keys.keys())
@@ -399,10 +421,20 @@ class NetworkConfigParser:
                 for interface_name in result_keys:
                     self.interfaces[todo_keys[interface_name]].peer = result_keys[interface_name]
                     todo_keys.pop(interface_name)
+                    # Cache Manager
+                    if self.cache_manager:
+                        self.cache_manager.set('{}.peer'.format(interface_name), result_keys[interface_name])
+
                 if not todo_keys:
                     break
                 time.sleep(1)
                 retry_counter += 1
+                if retry_counter >= max_retry_times:
+                    logger.error('max retry times exceeded')
+                    exit(1)
+
+        if parser_opts.skip_bird:
+            return
 
         # BIRD config
         interface_cidrs = [str(ipaddress.ip_interface(interface_item.address).network) for interface_item in self.interfaces.values() if interface_item.enable_ospf]

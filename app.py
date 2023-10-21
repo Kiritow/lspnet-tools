@@ -18,10 +18,11 @@ import ipaddress
 import socket
 import uuid
 import time
+import getopt
 from prettytable import PrettyTable
 from network_configparser import NetworkConfigParser
 from network_configparser import create_new_wireguard_keys
-from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig
+from config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, ParserOptions
 from get_logger import get_logger
 
 
@@ -416,7 +417,7 @@ def config_up(parser: NetworkConfigParser):
         # Cloud Report
         if interface_item.enable_report:
             start_link_reporter(task_prefix, INSTALL_DIR, parser.namespace, parser.manager_domain, parser.report_token, interface_item)
-        
+
         # Auto Refresh
         if interface_item.autorefresh:
             start_endpoint_refresher(task_prefix, INSTALL_DIR, parser.namespace, interface_item)
@@ -609,16 +610,29 @@ def show_network_status(parser: NetworkConfigParser):
 
 
 if __name__ == "__main__":
-    conf_file = sys.argv[1]
-    action = sys.argv[2]
+    _opts, args = getopt.getopt(sys.argv[1:], 'hc:', ['config=', 'offline', 'load-cache', 'update-cache'])
+    opts = {}
+    for k, v in _opts:
+        opts[k] = v
 
-    # compatible with old version
-    if not os.path.exists(conf_file) and os.path.exists(action):
-        logger.warning('new version requires conf_file at 1st place. please adjust your script to avoid future breaking changes')
-        conf_file, action = action, conf_file
+    conf_file = opts.get('-c') or opts.get('--config') or os.getenv('CONFIG_FILE')
+    action = args[0]
+
+    parser_opts = ParserOptions()
+    if action == 'status':
+        parser_opts.online_mode = False
+        parser_opts.skip_error_validate = True
+        parser_opts.skip_bird = True
+
+    if '--offline' in opts:
+        parser_opts.online_mode = False
+    if '--load-cache' in opts:
+        parser_opts.use_cahce = True
+    if '--update-cache' in opts:
+        parser_opts.use_cahce = True
 
     logger.info('using config file: {}'.format(conf_file))
-    config_parser = NetworkConfigParser(toml.loads(open(conf_file).read()))
+    config_parser = NetworkConfigParser(toml.loads(open(conf_file).read()), parser_opts)
 
     if action == 'up':
         config_up(config_parser)
