@@ -67,6 +67,19 @@ def ensure_netns(namespace):
     sudo_call(["ip", "netns", "add", namespace])
 
 
+def get_tempdir_path(namespace):
+    return "/tmp/networktools-{}".format(namespace)
+
+
+def ensure_tempdir(namespace):
+    subprocess.check_call(["mkdir", "-p", get_tempdir_path(namespace)])
+    subprocess.check_call(["mkdir", "-p", "{}/router".format(get_tempdir_path(namespace))])
+
+
+def clear_tempdir(namespace):
+    subprocess.check_call(["rm", "-rf", get_tempdir_path(namespace)])
+
+
 def create_wg_device(namespace, name, address, mtu):
     logger.info('creating wireguard device: {}'.format(name))
     sudo_call(["ip", "link", "add", "dev", name, "type", "wireguard"])
@@ -355,19 +368,20 @@ def shutdown_podman_router(namespace):
     if not container_inspect_result:
         return
 
-    temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(namespace))][0]
-
     logger.info('removing container: {}'.format(container_inspect_result['Id']))
     sudo_call(["podman", "rm", "-f", container_inspect_result['Id']])
 
-    logger.info('removing temp file: {}'.format(temp_filepath))
-    sudo_call(["rm", "-f", temp_filepath])
+    # make sure legacy mount/tmpfiles are cleared
+    temp_dirpath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(namespace))][0]
+    logger.info('removing temp directory: {}'.format(temp_dirpath))
+    sudo_call(["rm", "-rf", temp_dirpath])
 
 
 def config_up(parser: NetworkConfigParser):
     ensure_netns(parser.namespace)
     ensure_iptables(parser.namespace)
     ensure_ip_forward(parser.namespace)
+    ensure_tempdir(parser.namespace)
 
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
     
@@ -431,11 +445,14 @@ def config_up(parser: NetworkConfigParser):
                 start_phantun_server(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name, interface_item)
 
     # BIRD config
-    temp_filename = '/tmp/{}-{}.conf'.format(parser.namespace, uuid.uuid4())
-    with open(temp_filename, 'w') as f:
+    temp_dirpath = '/tmp/{}-{}'.format(parser.namespace, uuid.uuid4())
+    temp_filepath = '{}/bird.conf'.format(temp_dirpath)
+    sudo_call(["mkdir", temp_dirpath])
+
+    with open(temp_filepath, 'w') as f:
         f.write(parser.network_bird_config)
 
-    logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
+    logger.info('temp bird configuration file generated at: {}'.format(temp_filepath))
 
     # Remove bird contianer if exists
     shutdown_podman_router(parser.namespace)
@@ -444,7 +461,7 @@ def config_up(parser: NetworkConfigParser):
     logger.info('starting router...')
     sudo_call(["podman", "run", "--network", "ns:/var/run/netns/{}".format(parser.namespace), 
                "--cap-add", "NET_ADMIN", "--cap-add", "CAP_NET_BIND_SERVICE", "--cap-add", "NET_RAW", "--cap-add", "NET_BROADCAST",
-               "-v", "{}:/data/bird.conf:ro".format(temp_filename), "--name", "{}-router".format(parser.namespace),
+               "-v", "{}:/data:ro".format(temp_dirpath), "--name", "{}-router".format(parser.namespace),
                "-d", "bird-router"])
 
     logger.info('network is up.')
@@ -478,6 +495,7 @@ def config_down(parser: NetworkConfigParser):
     # Stop bird container
     shutdown_podman_router(parser.namespace)
 
+    clear_tempdir(parser.namespace)
     logger.info('network is down.')
 
 
@@ -488,17 +506,14 @@ def config_update(parser: NetworkConfigParser):
     if not container_inspect_result:
         return
 
-    old_temp_filepath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(parser.namespace))][0]
-
     # BIRD config
-    temp_filename = '/tmp/{}-{}.conf'.format(parser.namespace, uuid.uuid4())
-    with open(temp_filename, 'w') as f:
+    temp_filepath = '{}/router/bird.conf'.format(get_tempdir_path(parser.namespace))
+    with open(temp_filepath, 'w') as f:
         f.write(parser.network_bird_config)
 
-    logger.info('temp bird configuration file generated at: {}'.format(temp_filename))
+    logger.info('temp bird configuration file generated at: {}'.format(temp_filepath))
 
     # Update
-    sudo_call(["mv", temp_filename, old_temp_filepath])
     sudo_call(["podman", "exec", container_inspect_result['Id'], "birdc", "configure"])
 
 
