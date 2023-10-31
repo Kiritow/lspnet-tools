@@ -386,13 +386,16 @@ def config_up(parser: NetworkConfigParser):
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
     
     if parser.enable_local_dummy:
-        create_dummy_device(parser.local_dummy_interface.name, parser.local_dummy_interface.address, parser.local_dummy_interface.mtu)
+        vnetwork = ipaddress.ip_network(parser.local_dummy_interface.address)
+        vaddrs = list(vnetwork.hosts())
+        local_dummy_snat_address = str(vaddrs[0])
+        create_dummy_device(parser.local_dummy_interface.name, "{}/{}".format(vaddrs[0], vnetwork.prefixlen), parser.local_dummy_interface.mtu)
 
     if parser.enable_local_network and parser.enable_veth_link:
         create_veth_device(parser.namespace, parser.local_veth_prefix, parser.local_interface.address)
         try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "-d", parser.local_interface.address, "-o", "{}0".format(parser.local_veth_prefix), "-j", "ACCEPT"])
         if parser.enable_local_dummy:
-            snat_ip = parser.local_dummy_interface.get_first_address()
+            snat_ip = local_dummy_snat_address
         else:
             snat_ip = get_eth_ip(parser.local_interface.name)
         try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", parser.local_interface.address, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", snat_ip])
