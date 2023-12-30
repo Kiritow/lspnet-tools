@@ -372,7 +372,7 @@ def shutdown_podman_router(namespace):
     sudo_call(["podman", "rm", "-f", container_inspect_result['Id']])
 
     # make sure legacy mount/tmpfiles are cleared
-    temp_dirpath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result["HostConfig"]["Binds"] if temp_fullpath.startswith('/tmp/{}-'.format(namespace))][0]
+    temp_dirpath = [temp_fullpath.split(':')[0] for temp_fullpath in container_inspect_result["HostConfig"]["Binds"] if temp_fullpath.startswith(get_tempdir_path(namespace))][0]
     logger.info('removing temp directory: {}'.format(temp_dirpath))
     sudo_call(["rm", "-rf", temp_dirpath])
 
@@ -631,7 +631,11 @@ if __name__ == "__main__":
         opts[k] = v
 
     conf_file = opts.get('-c') or opts.get('--config') or os.getenv('CONFIG_FILE')
-    action = args[0]
+    if not conf_file and len(args) > 1:
+        print('Warning: no config file found in command line options or env vars. will use legacy mode to read config file.')
+        conf_file, action = args[0], args[1]
+    else:
+        action = args[0]
 
     parser_opts = ParserOptions()
     if action == 'status':

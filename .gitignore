@@ -1,6 +1,6 @@
 *.toml
+test*.py
 
 __pycache__/
 local/
 bin/
-
