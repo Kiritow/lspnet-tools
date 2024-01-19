@@ -4,13 +4,12 @@ import subprocess
 from datetime import datetime
 import time
 import ipaddress
-import traceback
 from typing import Dict
 from getpass import getpass
 
 from common.config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig, ParserOptions
 from common.utils import get_git_version
-from get_logger import get_logger
+from common.get_logger import get_logger
 from key_manager import KeyManager
 from cache_manager import CacheManager
 

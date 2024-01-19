@@ -1,9 +1,7 @@
 import os
 import json
-from get_logger import get_logger
 
-
-logger = get_logger('app')
+from common.utils import logger
 
 
 class CacheManager:

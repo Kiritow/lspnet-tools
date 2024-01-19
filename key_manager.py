@@ -1,6 +1,6 @@
 import os
 import requests
-from get_logger import get_logger
+from common.get_logger import get_logger
 
 
 logger = get_logger('app')
