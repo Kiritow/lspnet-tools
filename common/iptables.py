@@ -1,7 +1,8 @@
 import subprocess
 import traceback
-from utils import sudo_wrap, sudo_call
-from utils import logger
+
+from .utils import sudo_wrap, sudo_call
+from .utils import logger
 
 
 def try_create_iptables_chain(table_name, chain_name):

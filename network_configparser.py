@@ -9,27 +9,13 @@ from typing import Dict
 from getpass import getpass
 
 from common.config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig, ParserOptions
+from common.utils import get_git_version
 from get_logger import get_logger
 from key_manager import KeyManager
 from cache_manager import CacheManager
 
 logger = get_logger('app')
-
-try:
-    GIT_VERSION = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], encoding='utf-8').strip()
-except Exception:
-    logger.warning(traceback.format_exc())
-    logger.warning('unable to get version by git command, try .git parsing...')
-    try:
-        content = open('.git/HEAD').read().strip()
-        if 'ref:' in content:
-            real_path = os.path.join('.git', content.split(':')[1].strip())
-            GIT_VERSION = open(real_path).read().strip()
-        else:
-            GIT_VERSION = content
-    except Exception:
-        logger.warning(traceback.format_exc())
-        GIT_VERSION = "https://github.com/Kiritow/lspnet-tools"
+GIT_VERSION = get_git_version()
 
 
 def create_new_wireguard_keys(namespace, name):

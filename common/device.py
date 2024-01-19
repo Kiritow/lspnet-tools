@@ -3,8 +3,9 @@ import socket
 import ipaddress
 import uuid
 import json
-from utils import sudo_call, sudo_call_output, ns_wrap, ensure_netns
-from utils import logger
+
+from .utils import sudo_call, sudo_call_output, ns_wrap, ensure_netns
+from .utils import logger
 
 
 def create_wg_device(namespace, name, address, mtu):

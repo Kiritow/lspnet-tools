@@ -1,6 +1,7 @@
 import json
-from utils import sudo_call, sudo_call_output, get_tempdir_path
-from utils import logger
+
+from .utils import sudo_call, sudo_call_output, get_tempdir_path
+from .utils import logger
 
 
 def inspect_podman_router(namespace):

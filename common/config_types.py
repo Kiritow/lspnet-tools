@@ -1,7 +1,8 @@
 import ipaddress
 from dataclasses import dataclass
 from typing import Union
-from get_logger import get_logger
+
+from .get_logger import get_logger
 
 
 logger = get_logger('app')

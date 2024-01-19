@@ -1,8 +1,9 @@
 import os
 import uuid
-from config_types import ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, InterfaceConfig
-from iptables import try_append_iptables_rule
-from utils import sudo_call
+
+from .config_types import ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, InterfaceConfig
+from .iptables import try_append_iptables_rule
+from .utils import sudo_call
 
 
 def start_phantun_client(unit_prefix, install_dir, namespace, connector_item: ConnectorPhantunClientConfig, eth_name):
