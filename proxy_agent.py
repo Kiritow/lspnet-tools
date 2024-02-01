@@ -35,6 +35,16 @@ def do_get(url):
     return r.json()
 
 
+def do_post(url, jdata):
+    r = requests.post('{}{}'.format(API_HOST, url), headers={
+        'x-service-token': API_TOKEN,
+    }, json=jdata, timeout=5)
+    if r.status_code != 200:
+        raise Exception('got status code {}, expected 200'.format(r.status_code))
+    print(r.content)
+    return r.json()
+
+
 def get_config_list():
     config_list = do_get('/tunnel/list')
     return {
@@ -108,8 +118,13 @@ def start_gost_v2_simple(name, run_user):
     subprocess.check_call(call_args)
 
 
-def report_agent_status():
-    pass
+def report_agent_status(local_services):
+    try:
+        do_post('/tunnel/report', {
+            "running": local_services,
+        })
+    except Exception:
+        print(traceback.format_exc())
 
 
 def try_kill_service(real_name):
@@ -174,6 +189,9 @@ def agent_scan():
     for real_service_name in running_services:
         if real_service_name not in processed_services:
             try_kill_service(real_service_name)
+    
+    # report running services
+    report_agent_status(list_local_services())
 
 
 if __name__ == "__main__":
