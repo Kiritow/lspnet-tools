@@ -1,10 +1,10 @@
-from key_manager import KeyManager
 import subprocess
 import os
 import traceback
 import time
 import json
 import ipaddress
+import requests
 
 
 def nsexec_wrap(namespace, call_args):
@@ -62,6 +62,25 @@ def get_wg_rxtx(network_namespace, device_name):
     return int(parts[5]), int(parts[6])
 
 
+def report_link_stat(report_domain, report_token, interface_name, ping, rx, tx):
+    try:
+        domain_prefix = report_domain
+        if not domain_prefix.startswith('https://') and not domain_prefix.startswith('http://'):
+            domain_prefix = 'https://' + domain_prefix
+
+        r = requests.post('{}/link/report'.format(domain_prefix), headers={
+            'x-service-token': report_token,
+        }, json={
+            "name": interface_name,
+            "ping": ping,
+            "rx": rx,
+            "tx": tx,
+        }, timeout=10)
+        print(r.content)
+    except Exception:
+        print(traceback.format_exc())
+
+
 if __name__ == "__main__":
     REPORT_DOMAIN = os.getenv('REPORT_DOMAIN')
     REPORT_TOKEN = os.getenv('REPORT_TOKEN')
@@ -83,6 +102,4 @@ if __name__ == "__main__":
         ping_us = None
 
     rx, tx = get_wg_rxtx(REPORT_NAMESPACE, REPORT_INTERFACE_REAL)
-
-    m = KeyManager(REPORT_DOMAIN, REPORT_TOKEN)
-    m.report_stat(REPORT_INTERFACE, ping_us, rx, tx)
+    report_link_stat(REPORT_DOMAIN, REPORT_TOKEN, REPORT_INTERFACE, ping_us, rx, tx)
