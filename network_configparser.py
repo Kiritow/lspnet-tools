@@ -7,7 +7,7 @@ import ipaddress
 from typing import Dict
 from getpass import getpass
 
-from common.config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig, ParserOptions
+from common.config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, ForwarderConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig, ParserOptions
 from common.utils import get_git_version
 from common.get_logger import get_logger
 from key_manager import KeyManager
@@ -382,6 +382,17 @@ class NetworkConfigParser:
                     exit(1)
 
             new_interface.connector = new_connector
+            
+            # Forwarder
+            new_forwarder = None
+            if 'forwarder' in interface_config:
+                forwarder_config = interface_config['forwarder']
+                new_forwarder = ForwarderConfig(
+                    int(forwarder_config['from']),
+                    int(forwarder_config['to']),
+                )
+            
+            new_interface.forwarder = new_forwarder
 
             self.interfaces[new_interface.name] = new_interface
 

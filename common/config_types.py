@@ -68,6 +68,12 @@ class ConnectorPhantunServerConfig:
 
 
 @dataclass
+class ForwarderConfig:
+    from_port: int
+    to_port: int
+
+
+@dataclass
 class NetworkMappingConfig:
     from_addr: str
     to_addr: str
@@ -88,13 +94,14 @@ class InterfaceConfig:
     allowed: str = ''
     endpoint: str = ''
     keepalive: int = 0
-    autorefresh: bool = False
+    autorefresh: bool = False  # DDNS
     enable_ospf: bool = False
     ospf_config: CommonOSPFConfig = None
     enable_bfd: bool = False
     bfd_config: BFDConfig = None
     enable_report: bool = False
     connector: Union[ConnectorPhantunClientConfig, ConnectorPhantunClientConfig] = None
+    forwarder: ForwarderConfig = None  # Experimental
 
     def validate(self):
         if self.autorefresh and not self.endpoint:

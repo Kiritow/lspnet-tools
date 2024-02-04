@@ -31,6 +31,18 @@ def start_phantun_server(unit_prefix, install_dir, namespace, connector_item: Co
                bin_path, "--local", str(connector_item.local), "--remote", str(connector_item.remote), "--tun", connector_item.tun_name, "--tun-local", connector_item.tun_local, "--tun-peer", connector_item.tun_peer])
 
 
+def start_gost_forwarder(unit_prefix, install_dir, namespace, from_port, to_port, dst_port):
+    bin_path = os.path.join(install_dir, "bin", "gost")
+    
+    call_args = []
+    for port in range(from_port, to_port):
+        try_append_iptables_rule("filter", f"{namespace}-INPUT", ["-p", "udp", "--dport", str(port), "-j", "ACCEPT"])
+        call_args.append("-L=udp://:{}/127.0.0.1:{}".format(port, dst_port))
+    
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
+               bin_path] + call_args)
+
+
 def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkMappingConfig, eth_name):
     bin_path = os.path.join(install_dir, "bin", "nfq-worker")
 
