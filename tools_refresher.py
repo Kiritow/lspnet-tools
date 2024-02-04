@@ -20,7 +20,7 @@ def patch_wg_endpoint(network_namespace, device_name, endpoint):
     peer_public, peer_state = list(current_state["peers"].items())[0]
     if peer_state['endpoint'] != real_endpoint:
         print('patching interface {} endpoint from {} to {}'.format(device_name, peer_state['endpoint'], real_endpoint))
-        subprocess.check_call(ns_wrap(network_namespace, ["wg", "set", device_name, peer_public, "endpoint", real_endpoint]))
+        subprocess.check_call(ns_wrap(network_namespace, ["wg", "set", device_name, "peer", peer_public, "endpoint", real_endpoint]))
     else:
         print('interface {} endpoint matches ({}), skipped.'.format(device_name, peer_state['endpoint']))
 

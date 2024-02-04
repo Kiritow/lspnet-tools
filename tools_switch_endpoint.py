@@ -32,7 +32,7 @@ def check_and_switch_port(network_namespace, device_name, range_from_port, range
 
     next_endpoint = "{}:{}".format(parts[0], next_port)
     print('patching interface {} endpoint from {} to {}'.format(device_name, first_peer['endpoint'], next_endpoint))
-    subprocess.check_call(ns_wrap(network_namespace, ["wg", "set", device_name, first_peer_public, "endpoint", next_endpoint]))
+    subprocess.check_call(ns_wrap(network_namespace, ["wg", "set", device_name, "peer", first_peer_public, "endpoint", next_endpoint]))
 
 
 if __name__ == '__main__':

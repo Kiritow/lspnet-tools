@@ -52,7 +52,8 @@ def get_peer_ip(network_namespace, interface_name):
 
 def get_wg_rxtx(network_namespace, device_name):
     interface_state = dump_wireguard_state(network_namespace, device_name)
-    return interface_state['rx'], interface_state['tx']
+    peer_public, peer_state = list(interface_state["peers"].items())[0]
+    return peer_state['rx'], peer_state['tx']
 
 
 if __name__ == "__main__":
