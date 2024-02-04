@@ -1,8 +1,8 @@
 import subprocess
 import os
 import socket
-from ..common.utils import ns_wrap
-from ..common.device import dump_wireguard_state
+from common.utils import ns_wrap
+from common.device import dump_wireguard_state
 
 
 def patch_wg_endpoint(network_namespace, device_name, endpoint):

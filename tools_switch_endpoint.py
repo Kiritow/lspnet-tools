@@ -1,8 +1,8 @@
 import os
 import time
 import subprocess
-from ..common.utils import ns_wrap
-from ..common.device import dump_wireguard_state
+from common.utils import ns_wrap
+from common.device import dump_wireguard_state
 
 
 def check_and_switch_port(network_namespace, device_name, range_from_port, range_to_port):

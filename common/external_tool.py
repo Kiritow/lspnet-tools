@@ -65,7 +65,7 @@ def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkM
 
 
 def start_link_reporter(unit_prefix, install_dir, namespace, domain, report_token, interface_item: InterfaceConfig):
-    script_path = os.path.join(install_dir, 'tools', 'reporter.py')
+    script_path = os.path.join(install_dir, 'tools_reporter.py')
     
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
                "--timer-property", "AccuracySec=10",
@@ -82,7 +82,7 @@ def start_link_reporter(unit_prefix, install_dir, namespace, domain, report_toke
 
 
 def start_endpoint_refresher(unit_prefix, install_dir, namespace, interface_item: InterfaceConfig):
-    script_path = os.path.join(install_dir, 'tools', 'refresher.py')
+    script_path = os.path.join(install_dir, 'tools_refresher.py')
     
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
                "--timer-property", "AccuracySec=10",
@@ -97,7 +97,7 @@ def start_endpoint_refresher(unit_prefix, install_dir, namespace, interface_item
 
 
 def start_endpoint_switch_forwarder(unit_prefix, install_dir, namespace, interface_name, from_port, to_port):
-    script_path = os.path.join(install_dir, 'tools', 'switch_endpoint.py')
+    script_path = os.path.join(install_dir, 'tools_switch_endpoint.py')
     
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
                "--timer-property", "AccuracySec=10",

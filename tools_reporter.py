@@ -4,9 +4,9 @@ import traceback
 import time
 import json
 import ipaddress
-from ..common.utils import ns_wrap
-from ..common.device import dump_wireguard_state
-from ..common.key_manager import KeyManager
+from common.utils import ns_wrap
+from common.device import dump_wireguard_state
+from common.key_manager import KeyManager
 
 
 def check_direct_ping(network_namespace, target_ip, ping_count=10):
