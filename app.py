@@ -12,7 +12,7 @@ from network_configparser import create_new_wireguard_keys
 from common.config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, ParserOptions
 from common.utils import sudo_call, sudo_call_output
 from common.utils import ensure_netns, ensure_ip_forward, ensure_tempdir, clear_tempdir
-from common.utils import get_eth_ip, get_tempdir_path
+from common.utils import get_eth_ip, get_tempdir_path, get_all_loaded_services
 from common.utils import human_readable_bytes, human_readable_duration
 from common.device import create_dummy_device, create_veth_device, create_ns_connect, destroy_device_if_exists
 from common.device import create_wg_device, assign_wg_device, up_wg_device, dump_all_wireguard_state
@@ -132,8 +132,16 @@ def config_down(parser: NetworkConfigParser):
 
     # stop all tasks
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
-    sudo_call(["systemctl", "stop", "{}-*.timer".format(task_prefix)])
-    sudo_call(["systemctl", "stop", "{}-*.service".format(task_prefix)])
+    running_tasks = get_all_loaded_services()
+    running_timers = [task for task in running_tasks if task.startswith(task_prefix) and task.endswith('.timer')]
+    running_services = [task for task in running_tasks if task.startswith(task_prefix) and task.endswith('.service')]
+
+    logger.info('stopping timers: {}'.format(','.join(running_timers)))
+    for timer_name in running_timers:
+        sudo_call(["systemctl", "stop", timer_name])
+    logger.info('stopping services: {}'.format(','.join(running_services)))
+    for service_name in running_services:
+        sudo_call(["systemctl", "stop", service_name])
 
     clear_iptables(parser.namespace)
 

@@ -106,3 +106,8 @@ def get_git_version():
         except Exception:
             logger.warning(traceback.format_exc())
             return "https://github.com/Kiritow/lspnet-tools"
+
+
+def get_all_loaded_services():
+    output = sudo_call_output(["systemctl", "show", "*", "--state=loaded", "--property=Id", "--value"])
+    return list(set([line for line in output.split('\n') if line]))

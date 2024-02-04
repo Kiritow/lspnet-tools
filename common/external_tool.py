@@ -96,7 +96,7 @@ def start_endpoint_refresher(unit_prefix, install_dir, namespace, interface_item
 def start_endpoint_switch_forwarder(unit_prefix, install_dir, namespace, interface_name, from_port, to_port):
     script_path = os.path.join(install_dir, 'tools', 'switch_endpoint.py')
     
-    sudo_call(["systemd-run", "--unit", "()-{}".format(unit_prefix, uuid.uuid4()), "--collect",
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
                "--timer-property", "AccuracySec=10",
                "--timer-property", "RandomizedDelaySec=3",
                "--on-calendar", "*-*-* *:*:45",
