@@ -4,20 +4,16 @@ import traceback
 import time
 import json
 import ipaddress
-import requests
-
-
-def nsexec_wrap(namespace, call_args):
-    if namespace:
-        call_args = ["ip", "netns", "exec", namespace] + call_args
-    return call_args
+from ..common.utils import ns_wrap
+from ..common.device import dump_wireguard_state
+from ..common.key_manager import KeyManager
 
 
 def check_direct_ping(network_namespace, target_ip, ping_count=10):
     try:
         start_time = time.time()
         print('start ping test')
-        sub = subprocess.run(nsexec_wrap(network_namespace, ["ping", "-c", str(ping_count), "-n", "-r", target_ip]), encoding='utf-8', capture_output=True)
+        sub = subprocess.run(ns_wrap(network_namespace, ["ping", "-c", str(ping_count), "-n", "-r", target_ip]), encoding='utf-8', capture_output=True)
         print('ping test finished in {}s'.format(time.time() - start_time))
 
         for line in sub.stdout.split('\n'):
@@ -40,7 +36,7 @@ def check_direct_ping(network_namespace, target_ip, ping_count=10):
 
 def get_peer_ip(network_namespace, interface_name):
     try:
-        content = subprocess.check_output(nsexec_wrap(network_namespace, ["ip", "-j", "address", "show", "dev", interface_name]))
+        content = subprocess.check_output(ns_wrap(network_namespace, ["ip", "-j", "address", "show", "dev", interface_name]))
         content = json.loads(content)
         ipnet = ipaddress.ip_interface("{}/{}".format(content[0]['addr_info'][0]['local'], content[0]['addr_info'][0]['prefixlen'])).network
         first_addr = str(ipnet[1])
@@ -55,30 +51,8 @@ def get_peer_ip(network_namespace, interface_name):
 
 
 def get_wg_rxtx(network_namespace, device_name):
-    output = subprocess.check_output(nsexec_wrap(network_namespace, ["wg", "show", device_name, "dump"]), encoding='utf-8').split('\n')
-    line = output[1]
-    parts = line.split('\t')
-
-    return int(parts[5]), int(parts[6])
-
-
-def report_link_stat(report_domain, report_token, interface_name, ping, rx, tx):
-    try:
-        domain_prefix = report_domain
-        if not domain_prefix.startswith('https://') and not domain_prefix.startswith('http://'):
-            domain_prefix = 'https://' + domain_prefix
-
-        r = requests.post('{}/link/report'.format(domain_prefix), headers={
-            'x-service-token': report_token,
-        }, json={
-            "name": interface_name,
-            "ping": ping,
-            "rx": rx,
-            "tx": tx,
-        }, timeout=10)
-        print(r.content)
-    except Exception:
-        print(traceback.format_exc())
+    interface_state = dump_wireguard_state(network_namespace, device_name)
+    return interface_state['rx'], interface_state['tx']
 
 
 if __name__ == "__main__":
@@ -102,4 +76,6 @@ if __name__ == "__main__":
         ping_us = None
 
     rx, tx = get_wg_rxtx(REPORT_NAMESPACE, REPORT_INTERFACE_REAL)
-    report_link_stat(REPORT_DOMAIN, REPORT_TOKEN, REPORT_INTERFACE, ping_us, rx, tx)
+
+    m = KeyManager(REPORT_DOMAIN, REPORT_TOKEN)
+    m.report_stat(REPORT_INTERFACE, ping_us, rx, tx)

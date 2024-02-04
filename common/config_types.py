@@ -95,6 +95,7 @@ class InterfaceConfig:
     endpoint: str = ''
     keepalive: int = 0
     autorefresh: bool = False  # DDNS
+    multiport: int = 0
     enable_ospf: bool = False
     ospf_config: CommonOSPFConfig = None
     enable_bfd: bool = False

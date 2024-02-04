@@ -17,7 +17,7 @@ from common.utils import human_readable_bytes, human_readable_duration
 from common.device import create_dummy_device, create_veth_device, create_ns_connect, destroy_device_if_exists
 from common.device import create_wg_device, assign_wg_device, up_wg_device, dump_all_wireguard_state
 from common.iptables import ensure_iptables, try_append_iptables_rule, clear_iptables
-from common.external_tool import start_nfq_workers, start_link_reporter, start_phantun_client, start_phantun_server, start_gost_forwarder, start_endpoint_refresher
+from common.external_tool import start_nfq_workers, start_link_reporter, start_phantun_client, start_phantun_server, start_gost_forwarder, start_endpoint_refresher, start_endpoint_switch_forwarder
 from common.podman import inspect_podman_router, shutdown_podman_router, start_podman_router
 from common.best_toml import toml
 from common.utils import logger
@@ -94,6 +94,11 @@ def config_up(parser: NetworkConfigParser):
         if interface_item.autorefresh:
             start_endpoint_refresher(task_prefix, INSTALL_DIR, parser.namespace, interface_item)
 
+        # Multiport
+        if interface_item.multiport and interface_item.endpoint:
+            current_port = int(interface_item.endpoint.split(':')[1])
+            start_endpoint_switch_forwarder(task_prefix, INSTALL_DIR, parser.namespace, interface_item.name, current_port, current_port + interface_item.multiport)
+
         # Connector
         if interface_item.connector:
             connector_item = interface_item.connector
@@ -106,6 +111,7 @@ def config_up(parser: NetworkConfigParser):
         if interface_item.forwarder:
             forwarder_item = interface_item.forwarder
             start_gost_forwarder(task_prefix, INSTALL_DIR, parser.namespace, forwarder_item.from_port, forwarder_item.to_port, interface_item.listen)
+
 
     # BIRD config
     temp_filepath = '/tmp/{}'.format(uuid.uuid4())

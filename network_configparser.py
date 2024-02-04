@@ -10,8 +10,9 @@ from getpass import getpass
 from common.config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, ForwarderConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig, ParserOptions
 from common.utils import get_git_version
 from common.get_logger import get_logger
-from key_manager import KeyManager
+from common.key_manager import KeyManager
 from cache_manager import CacheManager
+
 
 logger = get_logger('app')
 GIT_VERSION = get_git_version()
@@ -296,7 +297,8 @@ class NetworkConfigParser:
                 '0.0.0.0/0',
                 interface_config.get('endpoint', ''),
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),
-                interface_config.get('autorefresh', False)
+                interface_config.get('autorefresh', False),
+                interface_config.get('multiport', 0),
             )
             new_interface.enable_ospf = interface_config.get('ospf', self.network_default_enable_ospf)
             if new_interface.enable_ospf:

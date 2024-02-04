@@ -114,6 +114,7 @@ def create_ns_connect(current_namespace, remote_namespace, veth_network):
 def dump_all_wireguard_state(namespace):
     output = sudo_call_output(ns_wrap(namespace, ["wg", "show", "all", "dump"]))
     interface_states = {}
+
     for line in output.split('\n'):
         if not line:
             continue
@@ -138,3 +139,33 @@ def dump_all_wireguard_state(namespace):
                 "keepalive": 0 if parts[8] == 'off' else int(parts[8]),
             }
     return interface_states
+
+
+def dump_wireguard_state(namespace, device_name):
+    output = sudo_call_output(ns_wrap(namespace, ["wg", "show", device_name, "dump"]))
+    interface_state = {}
+
+    for line in output.split('\n'):
+        if not line:
+            continue
+        parts = line.split('\t')
+        if len(parts) == 4:
+            interface_state = {
+                "private": parts[0],
+                "public": parts[1],
+                "listen": int(parts[2]),
+                "fwmark": 0 if parts[3] == 'off' else int(parts[3]),
+                "peers": {},
+            }
+        else:
+            interface_state["peers"][parts[0]] = {
+                "preshared": '' if parts[1] == '(none)' else parts[1],
+                "endpoint": '' if parts[2] == '(none)' else parts[2],
+                "allow": parts[3],
+                "handshake": int(parts[4]),
+                "rx": int(parts[5]),
+                "tx": int(parts[6]),
+                "keepalive": 0 if parts[7] == 'off' else int(parts[7]),
+            }
+
+    return interface_state
