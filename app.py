@@ -204,7 +204,7 @@ def show_network_status(parser: NetworkConfigParser):
 
     for interface_name, interface_config in parser.interfaces.items():
         if interface_name not in interface_states:
-            pt.add_row([interface_config.short_name, "<unknown>"])
+            pt.add_row([interface_config.short_name, "<unknown>", "", "", "", "", "", ""])
             continue
 
         interface_state = interface_states[interface_name]
