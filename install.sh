@@ -5,7 +5,8 @@ mkdir -p local
 
 sudo apt install -y wireguard
 sudo apt install -y python3 python3-pip podman
-sudo pip3 install requests tomli
+
+sudo pip3 install requests tomli prettytable
 pip3 install requests tomli prettytable
 sudo podman build . -t bird-router
 
