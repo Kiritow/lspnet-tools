@@ -36,9 +36,12 @@ def start_gost_forwarder(unit_prefix, install_dir, namespace, from_port, to_port
     
     call_args = []
     for port in range(from_port, to_port):
+        if port == dst_port:
+            continue
+
         try_append_iptables_rule("filter", f"{namespace}-INPUT", ["-p", "udp", "--dport", str(port), "-j", "ACCEPT"])
         call_args.append("-L=udp://:{}/127.0.0.1:{}".format(port, dst_port))
-    
+
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
                bin_path] + call_args)
 
