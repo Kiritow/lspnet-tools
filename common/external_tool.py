@@ -1,5 +1,6 @@
 import os
 import uuid
+import time
 
 from .config_types import ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, InterfaceConfig
 from .iptables import try_append_iptables_rule
@@ -108,5 +109,6 @@ def start_endpoint_switch_forwarder(unit_prefix, install_dir, namespace, interfa
                "-E", "INTERFACE_NAME={}".format(interface_name),
                "-E", "FROM_PORT={}".format(from_port),
                "-E", "TO_PORT={}".format(to_port),
+               "-E", "START_TIME={}".format(int(time.time())),
                "python3", script_path,
                ])

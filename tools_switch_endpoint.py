@@ -40,9 +40,14 @@ if __name__ == '__main__':
     INTERFACE_NAME = os.getenv('INTERFACE_NAME')
     FROM_PORT = int(os.getenv('FROM_PORT'))
     TO_PORT = int(os.getenv('TO_PORT'))
+    START_TIME = int(os.getenv('START_TIME'))
     
-    if not INTERFACE_NAME or not FROM_PORT or not TO_PORT:
+    if not INTERFACE_NAME or not FROM_PORT or not TO_PORT or not START_TIME:
         print('missing env vars')
         exit(1)
+
+    if (int(time.time()) - START_TIME) < 60:
+        print('skip checking, too quick since start')
+        exit(0)
 
     check_and_switch_port(NETWORK_NAMESPACE, INTERFACE_NAME, FROM_PORT, TO_PORT)
