@@ -393,7 +393,7 @@ class NetworkConfigParser:
                     int(forwarder_config['from']),
                     int(forwarder_config['to']),
                 )
-            
+
             new_interface.forwarder = new_forwarder
 
             self.interfaces[new_interface.name] = new_interface

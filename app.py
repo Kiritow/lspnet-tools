@@ -138,10 +138,17 @@ def config_down(parser: NetworkConfigParser):
 
     logger.info('stopping timers: {}'.format(','.join(running_timers)))
     for timer_name in running_timers:
-        sudo_call(["systemctl", "stop", timer_name])
+        try:
+            sudo_call(["systemctl", "stop", timer_name])
+        except Exception:
+            logger.warning('failed to stop {}: {}'.format(service_name, traceback.format_exc()))
+
     logger.info('stopping services: {}'.format(','.join(running_services)))
     for service_name in running_services:
-        sudo_call(["systemctl", "stop", service_name])
+        try:
+            sudo_call(["systemctl", "stop", service_name])
+        except Exception:
+            logger.warning('failed to stop {}: {}'.format(service_name, traceback.format_exc()))
 
     clear_iptables(parser.namespace)
 
