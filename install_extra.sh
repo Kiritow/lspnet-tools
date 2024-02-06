@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euxo pipefail
 
+mkdir -p bin
+
 cd bin
 wget https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
 gzip -d gost-linux-amd64-2.11.5.gz
