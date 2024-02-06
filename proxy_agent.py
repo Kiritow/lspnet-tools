@@ -25,7 +25,7 @@ def get_config_hash(conf_path):
         return ''
 
 
-def do_get(url):
+def do_get_json(url):
     r = requests.get('{}{}'.format(API_HOST, url), headers={
         'x-service-token': API_TOKEN,
     }, timeout=5)
@@ -42,11 +42,11 @@ def do_post(url, jdata):
     if r.status_code != 200:
         raise Exception('got status code {}, expected 200'.format(r.status_code))
     print(r.content)
-    return r.json()
+    return r.content
 
 
 def get_config_list():
-    config_list = do_get('/tunnel/list')
+    config_list = do_get_json('/tunnel/list')
     return {
         'frpc': config_list.get('frpc', []),
         'frps': config_list.get('frps', []),
@@ -67,7 +67,7 @@ def load_config(service_type, name, expected_hash):
 
         # config changed, download new config
         print('downloading config for [{}]{}...'.format(service_type, name))
-        new_config = do_get('/tunnel/config?name={}'.format(name))
+        new_config = do_get_json('/tunnel/config?name={}'.format(name))
         with open(conf_path, 'wb') as f:
             f.write(new_config['data'].encode())
 
