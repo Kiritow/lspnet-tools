@@ -1,6 +1,6 @@
 import ipaddress
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, List
 
 from .get_logger import get_logger
 
@@ -69,8 +69,8 @@ class ConnectorPhantunServerConfig:
 
 @dataclass
 class ForwarderConfig:
-    from_port: int
-    to_port: int
+    type: str
+    ports: List[int] = None
 
 
 @dataclass
@@ -102,7 +102,7 @@ class InterfaceConfig:
     bfd_config: BFDConfig = None
     enable_report: bool = False
     connector: Union[ConnectorPhantunClientConfig, ConnectorPhantunClientConfig] = None
-    forwarder: ForwarderConfig = None  # Experimental
+    forwarders: List[ForwarderConfig] = None  # Experimental
 
     def validate(self):
         if self.autorefresh and not self.endpoint:

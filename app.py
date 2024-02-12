@@ -17,6 +17,7 @@ from common.utils import human_readable_bytes, human_readable_duration
 from common.device import create_dummy_device, create_veth_device, create_ns_connect, destroy_device_if_exists
 from common.device import create_wg_device, assign_wg_device, up_wg_device, dump_all_wireguard_state
 from common.iptables import ensure_iptables, try_append_iptables_rule, clear_iptables
+from common.iptables_extra import try_append_iptables_multiple_port_forward_udp
 from common.external_tool import start_nfq_workers, start_link_reporter, start_phantun_client, start_phantun_server, start_gost_forwarder, start_endpoint_refresher, start_endpoint_switch_forwarder
 from common.podman import inspect_podman_router, shutdown_podman_router, start_podman_router
 from common.best_toml import toml
@@ -99,6 +100,11 @@ def config_up(parser: NetworkConfigParser):
             current_port = int(interface_item.endpoint.split(':')[1])
             start_endpoint_switch_forwarder(task_prefix, INSTALL_DIR, parser.namespace, interface_item.name, current_port, current_port + interface_item.multiport)
 
+        # Forwarder
+        if interface_item.forwarders:
+            for forwarder_item in interface_item.forwarders:
+                try_append_iptables_multiple_port_forward_udp(parser.namespace, parser.local_interface.name, forwarder_item.ports, interface_item.listen)
+
         # Connector
         if interface_item.connector:
             connector_item = interface_item.connector
@@ -106,11 +112,6 @@ def config_up(parser: NetworkConfigParser):
                 start_phantun_client(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name)
             elif isinstance(connector_item, ConnectorPhantunServerConfig):
                 start_phantun_server(task_prefix, INSTALL_DIR, parser.namespace, connector_item, parser.local_interface.name, interface_item)
-
-        # Forwarder
-        if interface_item.forwarder:
-            forwarder_item = interface_item.forwarder
-            start_gost_forwarder(task_prefix, INSTALL_DIR, parser.namespace, forwarder_item.from_port, forwarder_item.to_port, interface_item.listen)
 
 
     # BIRD config

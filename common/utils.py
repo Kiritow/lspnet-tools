@@ -1,6 +1,7 @@
 import os
 import subprocess
 import json
+import socket
 import traceback
 
 from .get_logger import get_logger
@@ -111,3 +112,27 @@ def get_git_version():
 def get_all_loaded_services():
     output = sudo_call_output(["systemctl", "show", "*", "--state=loaded", "--property=Id", "--value"])
     return list(set([line for line in output.split('\n') if line]))
+
+
+def parse_ports_expression(port_str: str):
+    parts = port_str.split(',')
+    all_ports = set()
+    for s in parts:
+        if '-' in s:
+            begin_port, end_port = s.split('-')
+            all_ports.update(range(int(begin_port), int(end_port)+1))
+        else:
+            all_ports.add(int(s))
+
+    return list(all_ports)
+
+
+def parse_endpoint_expression(endpoint_str: str):
+    parts = endpoint_str.split(':')
+    try:
+        real_host = socket.gethostbyname(parts[0])
+    except Exception:
+        logger.warning('unable to resolve: {}'.format(parts[0]))
+        real_host = ''
+
+    return parts[0], real_host, parse_ports_expression(parts[1])
