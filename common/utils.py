@@ -3,6 +3,7 @@ import subprocess
 import json
 import socket
 import traceback
+from typing import List
 
 from .get_logger import get_logger
 
@@ -136,3 +137,31 @@ def parse_endpoint_expression(endpoint_str: str):
         real_host = ''
 
     return parts[0], real_host, parse_ports_expression(parts[1])
+
+
+def ports_to_segments(ports: List[int]):
+    sorted_ports = sorted(set([int(x) for x in ports]))
+    segs = []
+    
+    begin_port = 0
+    end_port = 0
+    for port in sorted_ports:
+        if not begin_port:
+            begin_port = port
+            end_port = port
+            continue
+        
+        if port - end_port > 1:
+            # not-continuous
+            segs.append((begin_port, end_port))
+            begin_port = port
+            end_port = port
+            continue
+
+        # continous
+        end_port = port
+
+    if begin_port:
+        segs.append((begin_port, end_port))
+
+    return segs
