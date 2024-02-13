@@ -46,8 +46,8 @@ if __name__ == '__main__':
     START_TIME = int(os.getenv('START_TIME'))
 
     PORT_EXPRESSION = os.getenv('PORT_EXPRESSION')
-    FROM_PORT = int(os.getenv('FROM_PORT'))
-    TO_PORT = int(os.getenv('TO_PORT'))
+    FROM_PORT = os.getenv('FROM_PORT')
+    TO_PORT = os.getenv('TO_PORT')
 
     if not INTERFACE_NAME or not START_TIME:
         print('missing env vars')
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     if PORT_EXPRESSION:
         ports = parse_ports_expression(PORT_EXPRESSION)
     elif FROM_PORT and TO_PORT:
-        ports = list(range(FROM_PORT, TO_PORT))  # compatible with old version
+        ports = list(range(int(FROM_PORT), int(TO_PORT)))  # compatible with old version
 
     if (int(time.time()) - START_TIME) < 60:
         print('skip checking, too quick since start')
