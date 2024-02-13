@@ -303,11 +303,11 @@ class NetworkConfigParser:
                     # Compatiable with older version
                     if 'from' in forwarder_config and 'to' in forwarder_config:
                         source_ports = list(range(int(forwarder_config['from']), int(forwarder_config['to'])))
-                        new_interface.forwarders.append(ForwarderConfig('iptables', source_ports))
+                        new_interface.forwarders.append(ForwarderConfig('gost', source_ports))
                         continue
                     # New Syntax: a,b-c,d
                     source_ports = parse_ports_expression(forwarder_config['ports'])
-                    new_interface.forwarders.append(ForwarderConfig('iptables', source_ports))
+                    new_interface.forwarders.append(ForwarderConfig(forwarder_config.get('type', 'iptables'), source_ports))
 
             self.interfaces[new_interface.name] = new_interface
 

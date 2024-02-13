@@ -103,7 +103,10 @@ def config_up(parser: NetworkConfigParser):
         # Forwarder
         if interface_item.forwarders:
             for forwarder_item in interface_item.forwarders:
-                try_append_iptables_multiple_port_forward_udp(parser.namespace, parser.local_interface.name, forwarder_item.ports, interface_item.listen)
+                if forwarder_item.type == 'iptables':
+                    try_append_iptables_multiple_port_forward_udp(parser.namespace, parser.local_interface.name, forwarder_item.ports, interface_item.listen)
+                elif forwarder_item.type == 'gost':
+                    start_gost_forwarder(task_prefix, INSTALL_DIR, parser.namespace, forwarder_item.ports, interface_item.listen)
 
         # Connector
         if interface_item.connector:

@@ -4,7 +4,7 @@ import time
 
 from .config_types import ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, InterfaceConfig
 from .iptables import try_append_iptables_rule
-from .utils import sudo_call
+from .utils import sudo_call, ports_to_segments
 
 
 def start_phantun_client(unit_prefix, install_dir, namespace, connector_item: ConnectorPhantunClientConfig, eth_name):
@@ -32,15 +32,22 @@ def start_phantun_server(unit_prefix, install_dir, namespace, connector_item: Co
                bin_path, "--local", str(connector_item.local), "--remote", str(connector_item.remote), "--tun", connector_item.tun_name, "--tun-local", connector_item.tun_local, "--tun-peer", connector_item.tun_peer])
 
 
-def start_gost_forwarder(unit_prefix, install_dir, namespace, from_port, to_port, dst_port):
+def start_gost_forwarder(unit_prefix, install_dir, namespace, source_ports, dst_port):
     bin_path = os.path.join(install_dir, "bin", "gost")
     
+    port_segs = ports_to_segments(source_ports)
+    for seg in port_segs:
+        begin_port, end_port = seg
+        if end_port != begin_port:
+            real_port = "{}:{}".format(begin_port, end_port)
+        else:
+            real_port = begin_port
+        try_append_iptables_rule("filter", f"{namespace}-INPUT", ["-p", "udp", "--dport", str(real_port), "-j", "ACCEPT"])
+
     call_args = []
-    for port in range(from_port, to_port):
+    for port in source_ports:
         if port == dst_port:
             continue
-
-        try_append_iptables_rule("filter", f"{namespace}-INPUT", ["-p", "udp", "--dport", str(port), "-j", "ACCEPT"])
         call_args.append("-L=udp://:{}/127.0.0.1:{}".format(port, dst_port))
 
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
