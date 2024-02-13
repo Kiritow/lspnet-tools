@@ -3,7 +3,7 @@ import subprocess
 import json
 import socket
 import traceback
-from typing import List
+from typing import List, Tuple
 
 from .get_logger import get_logger
 
@@ -165,3 +165,15 @@ def ports_to_segments(ports: List[int]):
         segs.append((begin_port, end_port))
 
     return segs
+
+
+def port_segments_to_expression(segments: List[Tuple[int, int]]):
+    output = []
+    for seg in segments:
+        begin_port, end_port = seg
+        if end_port != begin_port:
+            output.append('{}-{}'.format(begin_port, end_port))
+        else:
+            output.append('{}'.format(begin_port))
+    
+    return ','.join(output)
