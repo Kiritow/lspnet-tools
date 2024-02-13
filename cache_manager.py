@@ -14,7 +14,7 @@ class CacheManager:
         if filepath and not os.path.exists(filepath):
             logger.warning('cache file does not exist: {}'.format(filepath))    
         elif filepath:
-            logger.debug('loading cache from {}...'.format(filepath))
+            logger.info('loading cache from {}...'.format(filepath))
 
             with open(filepath) as f:
                 content = f.read()
@@ -28,7 +28,7 @@ class CacheManager:
         content = json.dumps(self.cache, ensure_ascii=False)
 
         if self.cache_path:
-            logger.debug('saving cache to {}...'.format(self.cache_path))
+            logger.info('saving cache to {}...'.format(self.cache_path))
             with open(self.cache_path, 'w') as f:
                 f.write(content)
 
