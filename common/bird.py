@@ -40,8 +40,8 @@ protocol ospf v2 wg {
     ecmp yes;
     merge external yes;
     ipv4 {
-        #OSPF_IMPORT_FILTER#
-        #OSPF_EXPORT_FILTER#
+        #OSPF_IMPORT_FILTER#;
+        #OSPF_EXPORT_FILTER#;
     };
     
     #OSPF_AREA_CONFIG#
