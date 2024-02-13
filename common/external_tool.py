@@ -97,7 +97,7 @@ def start_endpoint_refresher(unit_prefix, install_dir, namespace, interface_item
                ])
 
 
-def start_endpoint_switch_forwarder(unit_prefix, install_dir, namespace, interface_name, from_port, to_port):
+def start_endpoint_switcher(unit_prefix, install_dir, namespace, interface_name, port_expression):
     script_path = os.path.join(install_dir, 'tools_switch_endpoint.py')
     
     sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
@@ -107,8 +107,7 @@ def start_endpoint_switch_forwarder(unit_prefix, install_dir, namespace, interfa
                "--property", "RuntimeMaxSec=15",
                "-E", "NETWORK_NAMESPACE={}".format(namespace),
                "-E", "INTERFACE_NAME={}".format(interface_name),
-               "-E", "FROM_PORT={}".format(from_port),
-               "-E", "TO_PORT={}".format(to_port),
+               "-E", "PORT_EXPRESSION={}".format(port_expression),
                "-E", "START_TIME={}".format(int(time.time())),
                "python3", script_path,
                ])

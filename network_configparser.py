@@ -9,7 +9,7 @@ from common.config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhan
 from common.bird import get_bird_config
 from common.get_logger import get_logger
 from common.key_manager import KeyManager
-from common.utils import parse_ports_expression
+from common.utils import parse_ports_expression, parse_endpoint_expression
 from cache_manager import CacheManager
 
 
@@ -198,8 +198,16 @@ class NetworkConfigParser:
                 interface_config.get('endpoint', ''),
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),
                 interface_config.get('autorefresh', False),
-                interface_config.get('multiport', 0),
             )
+            
+            # endpoint syntax and multiports
+            endpoint_host, _, endpoint_ports = parse_endpoint_expression(new_interface.endpoint)
+            if len(endpoint_ports) > 1:  # new syntax
+                new_interface.endpoint = "{}:{}".format(endpoint_host, endpoint_ports[0])
+            elif 'multiport' in interface_config:  # compatiable with old version
+                endpoint_ports = list(range(endpoint_ports[0], endpoint_ports[0] + int(interface_config['multiport'])))
+            new_interface.multiports = endpoint_ports
+
             new_interface.enable_ospf = interface_config.get('ospf', self.network_default_enable_ospf)
             if new_interface.enable_ospf:
                 new_interface.ospf_config = CommonOSPFConfig(

@@ -14,11 +14,12 @@ from common.utils import sudo_call, sudo_call_output
 from common.utils import ensure_netns, ensure_ip_forward, ensure_tempdir, clear_tempdir
 from common.utils import get_eth_ip, get_tempdir_path, get_all_loaded_services
 from common.utils import human_readable_bytes, human_readable_duration
+from common.utils import port_segments_to_expression, ports_to_segments
 from common.device import create_dummy_device, create_veth_device, create_ns_connect, destroy_device_if_exists
 from common.device import create_wg_device, assign_wg_device, up_wg_device, dump_all_wireguard_state
 from common.iptables import ensure_iptables, try_append_iptables_rule, clear_iptables
 from common.iptables_extra import try_append_iptables_multiple_port_forward_udp
-from common.external_tool import start_nfq_workers, start_link_reporter, start_phantun_client, start_phantun_server, start_gost_forwarder, start_endpoint_refresher, start_endpoint_switch_forwarder
+from common.external_tool import start_nfq_workers, start_link_reporter, start_phantun_client, start_phantun_server, start_gost_forwarder, start_endpoint_refresher, start_endpoint_switcher
 from common.podman import inspect_podman_router, shutdown_podman_router, start_podman_router
 from common.best_toml import toml
 from common.utils import logger
@@ -95,10 +96,9 @@ def config_up(parser: NetworkConfigParser):
         if interface_item.autorefresh:
             start_endpoint_refresher(task_prefix, INSTALL_DIR, parser.namespace, interface_item)
 
-        # Multiport
-        if interface_item.multiport and interface_item.endpoint:
-            current_port = int(interface_item.endpoint.split(':')[1])
-            start_endpoint_switch_forwarder(task_prefix, INSTALL_DIR, parser.namespace, interface_item.name, current_port, current_port + interface_item.multiport)
+        # Multiports
+        if interface_item.multiports and interface_item.endpoint:
+            start_endpoint_switcher(task_prefix, INSTALL_DIR, parser.namespace, interface_item.name, port_segments_to_expression(ports_to_segments(interface_item.multiports)))
 
         # Forwarder
         if interface_item.forwarders:

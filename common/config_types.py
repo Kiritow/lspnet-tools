@@ -95,12 +95,12 @@ class InterfaceConfig:
     endpoint: str = ''
     keepalive: int = 0
     autorefresh: bool = False  # DDNS
-    multiport: int = 0
     enable_ospf: bool = False
     ospf_config: CommonOSPFConfig = None
     enable_bfd: bool = False
     bfd_config: BFDConfig = None
     enable_report: bool = False
+    multiports: List[int] = None
     connector: Union[ConnectorPhantunClientConfig, ConnectorPhantunClientConfig] = None
     forwarders: List[ForwarderConfig] = None  # Experimental
 
