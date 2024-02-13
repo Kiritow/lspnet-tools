@@ -199,14 +199,15 @@ class NetworkConfigParser:
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),
                 interface_config.get('autorefresh', False),
             )
-            
+
             # endpoint syntax and multiports
-            endpoint_host, _, endpoint_ports = parse_endpoint_expression(new_interface.endpoint)
-            if len(endpoint_ports) > 1:  # new syntax
-                new_interface.endpoint = "{}:{}".format(endpoint_host, endpoint_ports[0])
-            elif 'multiport' in interface_config:  # compatiable with old version
-                endpoint_ports = list(range(endpoint_ports[0], endpoint_ports[0] + int(interface_config['multiport'])))
-            new_interface.multiports = endpoint_ports
+            if new_interface.endpoint:
+                endpoint_host, _, endpoint_ports = parse_endpoint_expression(new_interface.endpoint)
+                if len(endpoint_ports) > 1:  # new syntax
+                    new_interface.endpoint = "{}:{}".format(endpoint_host, endpoint_ports[0])
+                elif 'multiport' in interface_config:  # compatiable with old version
+                    endpoint_ports = list(range(endpoint_ports[0], endpoint_ports[0] + int(interface_config['multiport'])))
+                new_interface.multiports = endpoint_ports
 
             new_interface.enable_ospf = interface_config.get('ospf', self.network_default_enable_ospf)
             if new_interface.enable_ospf:
