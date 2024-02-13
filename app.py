@@ -255,7 +255,7 @@ def show_network_status(parser: NetworkConfigParser):
 
 
 if __name__ == "__main__":
-    _opts, args = getopt.getopt(sys.argv[1:], 'hc:', ['config=', 'offline', 'load-cache', 'update-cache'])
+    _opts, args = getopt.getopt(sys.argv[1:], 'hc:', ['config=', 'offline', 'cache', 'save'])
     opts = {}
     for k, v in _opts:
         opts[k] = v
@@ -275,10 +275,10 @@ if __name__ == "__main__":
 
     if '--offline' in opts:
         parser_opts.online_mode = False
-    if '--load-cache' in opts:
+    if '--cache' in opts:
         parser_opts.use_cache = True
-    if '--update-cache' in opts:
-        parser_opts.use_cache = True
+    if '--save' in opts:
+        parser_opts.save_cache = True
 
     logger.info('using config file: {}'.format(conf_file))
     config_parser = NetworkConfigParser(toml.loads(open(conf_file).read()), parser_opts)

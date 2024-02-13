@@ -82,9 +82,7 @@ class NetworkConfigParser:
         self.ifname_prefix = root_config.get('prefix', self.hostname)
         self.router_id = root_config.get('routerid', '')
 
-        self.cache_manager : CacheManager = None
-        if parser_opts.use_cache or parser_opts.save_cache:
-            self.cache_manager = CacheManager(readonly=not parser_opts.save_cache)
+        self.cache_manager = CacheManager(sync=False)
 
         self.key_manager : KeyManager = None
         self.report_token = ''
@@ -95,6 +93,11 @@ class NetworkConfigParser:
                 self.key_manager = KeyManager(self.manager_domain, load_or_login_manager(self.manager_domain, self.managed_network, self.hostname))
             else:
                 logger.warning('offline mode detected, skip loading KeyManager')
+            
+            # Only enable cache for managed networks
+            if parser_opts.use_cache or parser_opts.save_cache:
+                self.cache_manager = CacheManager(filepath=root_config.get('cache', 'local/{}.{}.cache'.format(self.managed_network, self.hostname)), 
+                                                  readonly=not parser_opts.save_cache)
 
         local_config = root_config.get('local', {})
         if not local_config:
@@ -168,16 +171,11 @@ class NetworkConfigParser:
 
         # Key manager
         cloud_keys = {}
-        cloud_links = {}
-        if self.cache_manager:
-            cloud_keys = self.cache_manager.get('keys') or {}
-            cloud_links = self.cache_manager.get('links') or {}
+        cloud_links = self.cache_manager.get('links') or {}
         if self.key_manager:
             cloud_keys = self.key_manager.list_keys()
             cloud_links = self.key_manager.list_links()
-            if self.cache_manager:
-                self.cache_manager.set('keys', cloud_keys)
-                self.cache_manager.set('links', cloud_links)
+            self.cache_manager.set('links', cloud_links)
 
         # Interfaces
         network_config = root_config['networks']
@@ -228,6 +226,13 @@ class NetworkConfigParser:
                 )
             new_interface.enable_report = interface_config.get('report', self.network_default_enable_report)
 
+            # Request report token
+            if new_interface.enable_report and not self.report_token:
+                self.report_token = self.cache_manager.get('report_token') or ''
+                if self.key_manager:
+                    self.report_token = self.key_manager.get_report_token()
+                    self.cache_manager.set('report_token', self.report_token)
+
             # Key Manager
             if self.key_manager:
                 if interface_name not in cloud_keys or cloud_keys[interface_name] != wg_config['public']:
@@ -235,17 +240,15 @@ class NetworkConfigParser:
 
                 if interface_name not in cloud_links:
                     cloud_links[interface_name] = self.key_manager.create_link(interface_name, new_interface.address, new_interface.mtu, new_interface.keepalive)
+                    self.cache_manager.set('links', cloud_links)
 
+            if interface_name in cloud_links:
                 logger.info('patching interface {} with cloud link: {}'.format(interface_name, json.dumps(cloud_links[interface_name])))
                 new_interface.address = cloud_links[interface_name]["address"]
                 if int(cloud_links[interface_name]["mtu"]) != 0:
                     new_interface.mtu = int(cloud_links[interface_name]["mtu"])
                 if int(cloud_links[interface_name]["keepalive"]) != 0:
                     new_interface.keepalive = int(cloud_links[interface_name]["keepalive"])
-
-                # Request report token
-                if new_interface.enable_report and not self.report_token:
-                    self.report_token = self.key_manager.get_report_token()
 
             # Validation
             if not new_interface.validate():
@@ -311,30 +314,29 @@ class NetworkConfigParser:
 
             self.interfaces[new_interface.name] = new_interface
 
-        # Key Manager
-        if self.key_manager:
-            todo_keys = {}
-            for interface_name, interface_config in network_config.items():
-                interface_real_name = "{}-{}".format(self.namespace, interface_name)
-                # Cache Manager
-                if not self.interfaces[interface_real_name].peer and self.cache_manager:
-                    self.interfaces[interface_real_name].peer = self.cache_manager.get('{}.peer'.format(interface_name)) or ''
-                if not self.interfaces[interface_real_name].peer:
-                    todo_keys[interface_name] = interface_real_name
+        # Key Manager: Peer Keys
+        todo_keys = {}
+        for interface_name, interface_config in network_config.items():
+            interface_real_name = "{}-{}".format(self.namespace, interface_name)
 
+            # if peer not specified in config file, load from cache first and load from key manager later
+            if not self.interfaces[interface_real_name].peer:
+                self.interfaces[interface_real_name].peer = self.cache_manager.get('{}.peer'.format(interface_name)) or ''
+                todo_keys[interface_name] = interface_real_name
+
+        if self.key_manager:
             retry_counter = 0
             max_retry_times = 60
 
             while True:
                 real_todo_keys = list(todo_keys.keys())
                 logger.info('requesting peer key for interface {}...{}'.format(','.join(real_todo_keys), " (tried {} time{})".format(retry_counter, 's' if retry_counter > 1 else '') if retry_counter else ''))
+
                 result_keys = self.key_manager.batch_request_key(real_todo_keys)
                 for interface_name in result_keys:
                     self.interfaces[todo_keys[interface_name]].peer = result_keys[interface_name]
+                    self.cache_manager.set('{}.peer'.format(interface_name), result_keys[interface_name])
                     todo_keys.pop(interface_name)
-                    # Cache Manager
-                    if self.cache_manager:
-                        self.cache_manager.set('{}.peer'.format(interface_name), result_keys[interface_name])
 
                 if not todo_keys:
                     break
@@ -343,6 +345,10 @@ class NetworkConfigParser:
                 if retry_counter >= max_retry_times:
                     logger.error('max retry times exceeded')
                     exit(1)
+        
+        if parser_opts.online_mode and todo_keys:
+            logger.error('peer key not specified: {}'.format(todo_keys))
+            exit(1)
 
         if parser_opts.skip_bird:
             return
