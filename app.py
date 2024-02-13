@@ -276,9 +276,9 @@ if __name__ == "__main__":
     if '--offline' in opts:
         parser_opts.online_mode = False
     if '--load-cache' in opts:
-        parser_opts.use_cahce = True
+        parser_opts.use_cache = True
     if '--update-cache' in opts:
-        parser_opts.use_cahce = True
+        parser_opts.use_cache = True
 
     logger.info('using config file: {}'.format(conf_file))
     config_parser = NetworkConfigParser(toml.loads(open(conf_file).read()), parser_opts)

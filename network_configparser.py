@@ -83,7 +83,7 @@ class NetworkConfigParser:
         self.router_id = root_config.get('routerid', '')
 
         self.cache_manager : CacheManager = None
-        if parser_opts.use_cahce or parser_opts.save_cache:
+        if parser_opts.use_cache or parser_opts.save_cache:
             self.cache_manager = CacheManager(readonly=not parser_opts.save_cache)
 
         self.key_manager : KeyManager = None
@@ -193,7 +193,7 @@ class NetworkConfigParser:
                 interface_config.get('mtu', 1420),
                 interface_config.get('address', ''),
                 interface_config.get('listen', 0),
-                interface_config.get('peer', '') if (self.key_manager or not parser_opts.online_mode) else interface_config['peer'],  # if managed or in offline mode, peer can be empty
+                interface_config.get('peer', '') if (self.key_manager or not parser_opts.online_mode) else interface_config['peer'],  # peer can be empty only if managed or in offline mode
                 '0.0.0.0/0',
                 interface_config.get('endpoint', ''),
                 interface_config.get('keepalive', 25 if interface_config.get('endpoint', '') else 0),

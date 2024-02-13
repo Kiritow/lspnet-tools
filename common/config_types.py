@@ -117,7 +117,7 @@ class InterfaceConfig:
 @dataclass
 class ParserOptions:
     online_mode: bool = True
-    use_cahce: bool = False
+    use_cache: bool = False
     save_cache: bool = False
     skip_error_validate: bool = False
     skip_bird: bool = False
