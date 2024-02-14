@@ -82,7 +82,7 @@ class NetworkConfigParser:
         self.ifname_prefix = root_config.get('prefix', self.hostname)
         self.router_id = root_config.get('routerid', '')
 
-        self.cache_manager = CacheManager(sync=False)
+        self.cache_manager = CacheManager(load=False, writeback=False)
 
         self.key_manager : KeyManager = None
         self.report_token = ''
@@ -97,7 +97,9 @@ class NetworkConfigParser:
             # Only enable cache for managed networks
             if parser_opts.use_cache or parser_opts.save_cache:
                 self.cache_manager = CacheManager(filepath=root_config.get('cache', 'local/{}.{}.cache'.format(self.managed_network, self.hostname)), 
-                                                  readonly=not parser_opts.save_cache)
+                                                  readonly=not parser_opts.save_cache,
+                                                  load=parser_opts.use_cache,
+                                                  writeback=parser_opts.save_cache)
 
         local_config = root_config.get('local', {})
         if not local_config:

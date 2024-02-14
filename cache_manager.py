@@ -5,12 +5,15 @@ from common.utils import logger
 
 
 class CacheManager:
-    def __init__(self, filepath='', readonly=False, sync=True):
+    def __init__(self, filepath='', readonly=False, writeback=True, load=True):
         self.cache_path = filepath
         self.readonly = readonly
-        self.writeback = sync
+        self.writeback = writeback
 
         self.cache = {}
+        if not load:
+            return
+
         if filepath and not os.path.exists(filepath):
             logger.warning('cache file does not exist: {}'.format(filepath))    
         elif filepath:
