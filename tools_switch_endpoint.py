@@ -28,7 +28,7 @@ def check_and_switch_port(network_namespace, device_name, ports: List[int]):
     # Find current port in ports
     try:
         next_port = ports[ports.index(current_port) + 1]
-    except ValueError:
+    except (IndexError,ValueError):
         next_port = ports[0]
 
     if current_port == next_port:

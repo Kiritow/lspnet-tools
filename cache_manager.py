@@ -15,7 +15,7 @@ class CacheManager:
             return
 
         if filepath and not os.path.exists(filepath):
-            logger.warning('cache file does not exist: {}'.format(filepath))    
+            logger.warning('cache file does not exist: {}'.format(filepath))
         elif filepath:
             logger.info('loading cache from {}...'.format(filepath))
 
