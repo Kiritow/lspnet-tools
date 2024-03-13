@@ -5,6 +5,7 @@ import subprocess
 import traceback
 import requests
 import hashlib
+from typing import List, Dict, Callable
 
 
 API_HOST = os.getenv('API_HOST')
@@ -142,52 +143,29 @@ def list_local_services():
     return list(set([line for line in output.split('\n') if line and line.startswith('proxy-agent-')]))
 
 
+def process_scan_type(type_name: str, config_list: Dict[str, List[any]], running_services: List[str], processed_services: List[str], fn_start_service: Callable[[str, str]]):
+    for service_config in config_list[type_name]:
+        service_name = service_config['name']
+        expected_hash = service_config['hash']
+
+        real_service_name = 'proxy-agent-{}-{}.service'.format(type_name, service_name)
+        need_update = load_config(type_name, service_name, expected_hash)
+        if need_update and real_service_name in running_services:
+            try_kill_service(real_service_name)
+        if need_update or real_service_name not in running_services:
+            fn_start_service(service_name, RUN_USER)
+
+        processed_services.append(real_service_name)
+
+
 def agent_scan():
     config_list = get_config_list()
     processed_services = []
     running_services = list_local_services()
-
-    # frps
-    for service_config in config_list['frps']:
-        service_name = service_config['name']
-        expected_hash = service_config['hash']
-
-        real_service_name = 'proxy-agent-frps-{}.service'.format(service_name)
-        need_update = load_config('frps', service_name, expected_hash)
-        if need_update:
-            if real_service_name in running_services:
-                try_kill_service(real_service_name)
-            start_frp_server(service_name, RUN_USER)
-
-        processed_services.append(real_service_name)
-
-    # frpc
-    for service_config in config_list['frpc']:
-        service_name = service_config['name']
-        expected_hash = service_config['hash']
-        
-        real_service_name = 'proxy-agent-frpc-{}.service'.format(service_name)
-        need_update = load_config('frpc', service_name, expected_hash)
-        if need_update:
-            if real_service_name in running_services:
-                try_kill_service(real_service_name)
-            start_frp_client(service_name, RUN_USER)
-
-        processed_services.append(real_service_name)
-
-    # gost
-    for service_config in config_list['gost']:
-        service_name = service_config['name']
-        expected_hash = service_config['hash']
-
-        real_service_name = 'proxy-agent-gost-{}.service'.format(service_name)
-        need_update = load_config('gost', service_name, expected_hash)
-        if need_update:
-            if real_service_name in running_services:
-                try_kill_service(real_service_name)
-            start_gost_v2_simple(service_name, RUN_USER)
-
-        processed_services.append(real_service_name)
+    
+    process_scan_type('frps', config_list, running_services, processed_services, start_frp_server)
+    process_scan_type('frpc', config_list, running_services, processed_services, start_frp_client)
+    process_scan_type('gost', config_list, running_services, processed_services, start_gost_v2_simple)
 
     # kill expired services
     for real_service_name in running_services:
