@@ -391,4 +391,3 @@ class NetworkConfigParser:
             ospf_area_config[temp_ospf_config.area]["veth-*"] = temp_ospf_config
 
         self.network_bird_config = get_bird_config('', [], interface_cidrs, [], ospf_area_config, bfd_config)
-        self.network_bird_config_dynamic = get_bird_config('', [], interface_cidrs, [], ospf_area_config, bfd_config, is_dynamic=True)

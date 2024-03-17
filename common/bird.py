@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Dict, Any
 from .config_types import CommonOSPFConfig, BFDConfig
@@ -56,6 +57,24 @@ def render_config(template: str, params: Dict[str, Any]):
     return content
 
 
+def simple_format(content):
+    output = []
+    level = 0
+
+    for line in content.split('\n'):
+        sline = line.strip()
+        if sline.startswith('#'):
+            output.append(sline)
+            continue
+        if sline.startswith('}'):
+            level = max(0, level - 1)
+        output.append('  ' * level + sline)
+        if sline.endswith('{'):
+            level += 1
+
+    return '\n'.join(output)
+
+
 def get_bird_config(router_id, direct_interface_names, ospf_exclude_import_cidrs, ospf_exclude_export_cidrs, ospf_area_config: Dict[str, Dict[str, CommonOSPFConfig]], bfd_config: Dict[str, BFDConfig], is_dynamic=False):
     current_time_text = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -82,10 +101,9 @@ else reject;
             if interface_name in bfd_config:
                 text_parts.append("bfd yes;")
             if ospf_interface_config.cost:
-                if is_dynamic:
-                    text_parts.append("cost #OSPF_INTERFACE_COST_{}#;".format(interface_name))
-                else:
-                    text_parts.append("cost {};".format(ospf_interface_config.cost))
+                hint_tag = {"type": "cost", "raw": "cost {};", "skips": 1, "interface": interface_name}
+                text_parts.append('#HINT: {}'.format(json.dumps(hint_tag)))
+                text_parts.append("cost {};".format(ospf_interface_config.cost))
             if ospf_interface_config.type:
                 text_parts.append("type {};".format(ospf_interface_config.type))
             if ospf_interface_config.auth:
@@ -120,7 +138,7 @@ algorithm hmac sha512;
 
     final_bfd_text = '\n'.join(all_bfd_texts)
 
-    return render_config(BIRD_CONFIG_TEMPLATE, {
+    return simple_format(render_config(BIRD_CONFIG_TEMPLATE, {
         'CURRENT_TIME': current_time_text,
         'GIT_VERSION': get_git_version(),
         'LOCALNET_NO_IMPORT': localnet_no_import_variable_text,
@@ -131,5 +149,4 @@ algorithm hmac sha512;
         'OSPF_IMPORT_FILTER': import_filter_text,
         'OSPF_EXPORT_FILTER': export_filter_text,
         'OSPF_AREA_CONFIG': final_area_text,
-    })
-
+    }))
