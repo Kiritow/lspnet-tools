@@ -10,7 +10,7 @@ def check_direct_ping(network_namespace, target_ip, ping_count=10):
     try:
         start_time = time.time()
         print('start ping test')
-        sub = subprocess.run(sudo_wrap(ns_wrap(network_namespace, ["ping", "-c", str(ping_count), "-n", "-r", target_ip]), encoding='utf-8', capture_output=True))
+        sub = subprocess.run(sudo_wrap(ns_wrap(network_namespace, ["ping", "-c", str(ping_count), "-n", "-r", target_ip])), encoding='utf-8', capture_output=True)
         print('ping test finished in {}s'.format(time.time() - start_time))
 
         for line in sub.stdout.split('\n'):
