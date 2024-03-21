@@ -72,9 +72,9 @@ if __name__ == "__main__":
     if len(interfaces) < 2:
         process_single_interface(interfaces[0])
     else:
-        pool = ThreadPoolExecutor(max_workers=4)
-        for interface_name in interfaces:
-            pool.submit(process_single_interface, interface_name)
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            for interface_name in interfaces:
+                pool.submit(process_single_interface, interface_name)
 
     with open(INPUT_CONFIG) as f:
         content = f.read()
