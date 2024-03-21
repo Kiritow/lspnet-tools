@@ -100,10 +100,10 @@ else reject;
             text_parts.append(f'''interface "{interface_name}" {{''')
             if interface_name in bfd_config:
                 text_parts.append("bfd yes;")
-            if ospf_interface_config.cost:
-                hint_tag = {"type": "cost", "raw": "cost {};", "skips": 1, "interface": interface_name}
+            if ospf_interface_config.cost or ospf_interface_config.pingcost:
+                hint_tag = {"type": "cost", "raw": "cost {};", "skips": 1, "interface": interface_name, "pingcost": int(ospf_interface_config.pingcost)}
                 text_parts.append('#HINT: {}'.format(json.dumps(hint_tag)))
-                text_parts.append("cost {};".format(ospf_interface_config.cost))
+                text_parts.append("cost {};".format(ospf_interface_config.cost or 500))
             if ospf_interface_config.type:
                 text_parts.append("type {};".format(ospf_interface_config.type))
             if ospf_interface_config.auth:

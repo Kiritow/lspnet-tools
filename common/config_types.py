@@ -32,6 +32,7 @@ class CommonOSPFConfig:
     cost: int = 0
     auth: str = ''
     type: str = ''
+    pingcost: int = 0
 
 
 @dataclass

@@ -152,6 +152,7 @@ class NetworkConfigParser:
             network_config.get('cost', 0),
             network_config.get('auth', ''),
             'ptp',
+            network_config.get('pingcost', 0),
         )
         self.network_default_enable_bfd = network_config.get('bfd', False)
         self.network_default_bfd_config = BFDConfig(
@@ -216,6 +217,7 @@ class NetworkConfigParser:
                     interface_config.get('cost', self.network_default_ospf_config.cost),
                     interface_config.get('auth', self.network_default_ospf_config.auth),
                     'ptp',
+                    interface_config.get('pingcost', self.network_default_ospf_config.pingcost),
                 )
             new_interface.enable_bfd = interface_config.get('bfd', self.network_default_enable_bfd)
             if new_interface.enable_bfd:

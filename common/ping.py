@@ -20,7 +20,7 @@ def get_direct_ping_us(network_namespace, target_ip, ping_count=10):
 
             print(line)
             parts = line.split('=')[1].strip().split('/')
-            ping_result = max(int(float(parts[1]) * 1000), 0)
+            ping_result = max(0, int(float(parts[1]) * 1000))
             print('namespace: {} target: {} count: {} ping: {}us ({})'.format(network_namespace, target_ip, ping_count, ping_result, parts[1]))
             return ping_result
 

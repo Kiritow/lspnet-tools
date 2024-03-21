@@ -17,8 +17,9 @@ def render_single_hint(hint_tag, ping_data):
     interface_name = hint_tag['interface']
     if interface_name not in ping_data:
         return False, None
-
-    return True, (skip, [hint_tag["raw"].format(ping_data[interface_name])])
+    
+    real_cost = max(1, ping_data[interface_name] + hint_tag['pingcost'])
+    return True, (skip, [hint_tag["raw"].format(real_cost)])
 
 
 def render_hint_pingcost(content, ping_data):
@@ -67,7 +68,7 @@ if __name__ == "__main__":
         if ping_us < 1:
             return
         with ping_data_lock:
-            ping_data[interface_name] = max(int(math.ceil(ping_us / 1000)), 1)
+            ping_data[interface_name] = max(1, int(math.ceil(ping_us / 1000)))
 
     if len(interfaces) < 2:
         process_single_interface(interfaces[0])
