@@ -186,6 +186,7 @@ class NetworkConfigParser:
 
         for interface_name, interface_config in network_config.items():
             wg_config = load_or_create_keys(self.namespace, interface_name)
+            wg_listen_ports = parse_ports_expression(str(interface_config.get('listen', 0)))
             new_interface = InterfaceConfig(
                 interface_name,
                 "{}-{}".format(self.namespace, interface_name),
@@ -193,7 +194,7 @@ class NetworkConfigParser:
                 wg_config['public'],
                 interface_config.get('mtu', 1420),
                 interface_config.get('address', ''),
-                interface_config.get('listen', 0),
+                wg_listen_ports[0],
                 interface_config.get('peer', '') if (self.key_manager or not parser_opts.online_mode) else interface_config['peer'],  # peer can be empty only if managed or in offline mode
                 '0.0.0.0/0',
                 interface_config.get('endpoint', ''),
@@ -315,6 +316,10 @@ class NetworkConfigParser:
                     # New Syntax: a,b-c,d
                     source_ports = parse_ports_expression(forwarder_config['ports'])
                     new_interface.forwarders.append(ForwarderConfig(forwarder_config.get('type', 'iptables'), source_ports))
+
+            # WireGuard listen expression
+            if len(wg_listen_ports) > 1:
+                new_interface.forwarders.append(ForwarderConfig('gost', wg_listen_ports))
 
             self.interfaces[new_interface.name] = new_interface
 
