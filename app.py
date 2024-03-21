@@ -19,7 +19,7 @@ from common.device import create_dummy_device, create_veth_device, create_ns_con
 from common.device import create_wg_device, assign_wg_device, up_wg_device, dump_all_wireguard_state
 from common.iptables import ensure_iptables, try_append_iptables_rule, clear_iptables
 from common.iptables_extra import try_append_iptables_multiple_port_forward_udp
-from common.external_tool import start_nfq_workers, start_link_reporter, start_phantun_client, start_phantun_server, start_gost_forwarder, start_endpoint_refresher, start_endpoint_switcher
+from common.external_tool import start_nfq_workers, start_link_reporter, start_phantun_client, start_phantun_server, start_gost_forwarder, start_endpoint_refresher, start_endpoint_switcher, start_bird_pingcost
 from common.podman import inspect_podman_router, shutdown_podman_router, start_podman_router
 from common.best_toml import toml
 from common.utils import logger
@@ -122,11 +122,17 @@ def config_up(parser: NetworkConfigParser):
     with open(temp_filepath, 'w') as f:
         f.write(parser.network_bird_config)
     logger.info('temp bird configuration file generated at: {}'.format(temp_filepath))
-    sudo_call(["mv", temp_filepath, "{}/router/bird.conf".format(get_tempdir_path(parser.namespace))])
+    target_bird_filepath = "{}/router/bird.conf".format(get_tempdir_path(parser.namespace))
+    sudo_call(["mv", temp_filepath, target_bird_filepath])
 
     # Remove bird contianer if exists
     shutdown_podman_router(parser.namespace)
     start_podman_router(parser.namespace)
+
+    # pingcost
+    pingcost_interfaces = [interface_name for interface_name, interface_item in parser.interfaces.items() if interface_item.enable_ospf and interface_item.ospf_config and interface_item.ospf_config.pingcost]
+    if pingcost_interfaces:
+        start_bird_pingcost(task_prefix, INSTALL_DIR, parser.namespace, pingcost_interfaces, target_bird_filepath)
 
     logger.info('network is up.')
 

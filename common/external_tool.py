@@ -1,6 +1,7 @@
 import os
 import uuid
 import time
+from typing import List
 
 from .config_types import ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, NetworkMappingConfig, InterfaceConfig
 from .iptables import try_append_iptables_rule
@@ -116,5 +117,20 @@ def start_endpoint_switcher(unit_prefix, install_dir, namespace, interface_name,
                "-E", "INTERFACE_NAME={}".format(interface_name),
                "-E", "PORT_EXPRESSION={}".format(port_expression),
                "-E", "START_TIME={}".format(int(time.time())),
+               "python3", script_path,
+               ])
+
+
+def start_bird_pingcost(unit_prefix, install_dir, namespace, interface_list: List[str], bird_config_filepath):
+    script_path = os.path.join(install_dir, 'tools_pingcost.py')
+
+    sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect",
+               "--timer-property", "AccuracySec=10",
+               "--timer-property", "RandomizedDelaySec=3",
+               "--on-calendar", "*-*-* *:*:00",
+               "--property", "RuntimeMaxSec=45",
+               "-E", "NETWORK_NAMESPACE={}".format(namespace),
+               "-E", "INTERFACE_LIST={}".format(','.join(interface_list)),
+               "-E", "INPUT_CONFIG={}".format(bird_config_filepath),
                "python3", script_path,
                ])
