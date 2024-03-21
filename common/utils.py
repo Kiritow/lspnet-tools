@@ -3,6 +3,8 @@ import subprocess
 import json
 import socket
 import traceback
+import pwd
+import grp
 from typing import List, Tuple
 
 from .get_logger import get_logger
@@ -92,22 +94,24 @@ def human_readable_duration(s):
     return "{}h{}m{}s".format(int(s / 3600), int((s % 3600) / 60), s % 60)
 
 
+def get_git_version_user():
+    try:
+        stat = os.stat('.')
+        uid, gid = stat.st_uid, stat.st_gid
+        uname = pwd.getpwuid(uid).pw_name
+        gname = grp.getgrgid(gid).gr_name
+        return subprocess.check_output(["sudo", "-u", uname, "-g", gname, "git", "rev-parse", "--verify", "HEAD"], encoding='utf-8').strip()
+    except Exception:
+        logger.warn(traceback.format_exc())
+        return "https://github.com/Kiritow/lspnet-tools"
+
+
 def get_git_version():
     try:
         return subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], encoding='utf-8').strip()
     except Exception:
-        logger.warning(traceback.format_exc())
-        logger.warning('unable to get version by git command, try .git parsing...')
-        try:
-            content = open('.git/HEAD').read().strip()
-            if 'ref:' in content:
-                real_path = os.path.join('.git', content.split(':')[1].strip())
-                return open(real_path).read().strip()
-            else:
-                return content
-        except Exception:
-            logger.warning(traceback.format_exc())
-            return "https://github.com/Kiritow/lspnet-tools"
+        logger.warning('unable to get git commit, try again with correct user...')
+        return get_git_version_user()
 
 
 def get_all_loaded_services():
