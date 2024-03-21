@@ -2,6 +2,8 @@ import os
 import json
 import math
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 from common.ping import get_direct_ping_us, get_peer_ip
 from common.podman import inspect_podman_router
 from common.bird import simple_format
@@ -57,12 +59,22 @@ if __name__ == "__main__":
 
     interfaces = INTERFACE_LIST.split(',')
     ping_data = {}
-    for interface_name in interfaces:
+    ping_data_lock = Lock()
+
+    def process_single_interface(interface_name):
         peer_ip = get_peer_ip(NETWORK_NAMESPACE, interface_name)
         ping_us = get_direct_ping_us(NETWORK_NAMESPACE, peer_ip, ping_count=5)
         if ping_us < 1:
-            continue
-        ping_data[interface_name] = max(int(math.ceil(ping_us / 1000)), 1)
+            return
+        with ping_data_lock:
+            ping_data[interface_name] = max(int(math.ceil(ping_us / 1000)), 1)
+
+    if len(interfaces) < 2:
+        process_single_interface(interfaces[0])
+    else:
+        pool = ThreadPoolExecutor(max_workers=4)
+        for interface_name in interfaces:
+            pool.submit(process_single_interface, interface_name)
 
     with open(INPUT_CONFIG) as f:
         content = f.read()
