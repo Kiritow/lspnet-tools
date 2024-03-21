@@ -1,7 +1,7 @@
 import os
 import json
 import math
-from common.ping import check_direct_ping, get_peer_ip
+from common.ping import get_direct_ping_us, get_peer_ip
 from common.bird import simple_format
 
 
@@ -31,12 +31,10 @@ def render_hint_pingcost(content, ping_data):
 
         hint_tag = json.loads(line.replace('#HINT: ', ''))
         if hint_tag['type'] != 'cost':
-            output.append(line)
             continue
 
         is_valid, hint_data = render_single_hint(hint_tag, ping_data)
         if not is_valid:
-            output.append(line)
             continue
 
         skip, next_lines = hint_data
@@ -58,7 +56,7 @@ if __name__ == "__main__":
     ping_data = {}
     for interface_name in interfaces:
         peer_ip = get_peer_ip(NETWORK_NAMESPACE, interface_name)
-        ping_us = check_direct_ping(NETWORK_NAMESPACE, peer_ip, ping_count=5)
+        ping_us = get_direct_ping_us(NETWORK_NAMESPACE, peer_ip, ping_count=5)
         if ping_us < 1:
             continue
         ping_data[interface_name] = int(math.ceil(ping_us // 1000))

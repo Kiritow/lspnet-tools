@@ -6,7 +6,8 @@ import ipaddress
 from common.utils import ns_wrap, sudo_wrap
 
 
-def check_direct_ping(network_namespace, target_ip, ping_count=10):
+# get direct ping, return -1 if error
+def get_direct_ping_us(network_namespace, target_ip, ping_count=10):
     try:
         start_time = time.time()
         print('start ping test')

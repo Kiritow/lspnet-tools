@@ -1,7 +1,7 @@
 import os
 from common.device import dump_wireguard_state
 from common.key_manager import KeyManager
-from common.ping import check_direct_ping, get_peer_ip
+from common.ping import get_direct_ping_us, get_peer_ip
 
 
 def get_wg_rxtx(network_namespace, device_name):
@@ -26,7 +26,7 @@ if __name__ == "__main__":
         REPORT_IP = get_peer_ip(REPORT_NAMESPACE, REPORT_INTERFACE_REAL)
         print('using REPORT_IP={}'.format(REPORT_IP))
 
-    ping_us = check_direct_ping(REPORT_NAMESPACE, REPORT_IP)
+    ping_us = get_direct_ping_us(REPORT_NAMESPACE, REPORT_IP)
     if ping_us < 0:
         ping_us = None
 
