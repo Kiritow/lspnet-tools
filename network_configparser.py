@@ -5,7 +5,7 @@ import ipaddress
 from typing import Dict
 from getpass import getpass
 
-from common.config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, ForwarderConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig, ParserOptions
+from common.config_types import CommonOSPFConfig, InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, ServiceWireGuard, ForwarderConfig, NetworkMappingConfig, BFDConfig, NamespaceConnectConfig, DummyInterfaceConfig, ParserOptions
 from common.bird import get_bird_config
 from common.get_logger import get_logger
 from common.key_manager import KeyManager
@@ -144,6 +144,30 @@ class NetworkConfigParser:
             for connect_config in local_connect_config:
                 new_connect_config = NamespaceConnectConfig(connect_config["namespace"], connect_config["network"])
                 self.local_connect_namespaces.append(new_connect_config)
+
+            # Customized connect service
+            local_service_config = local_config.get('service', [])
+            self.local_services = []
+            for service_config in local_service_config:
+                if service_config['type'] == 'wireguard':
+                    wg_config = load_or_create_keys(self.namespace, "service-{}".format(service_config["name"]))
+                    self.local_services.append(ServiceWireGuard(
+                        service_config['name'],
+                        "{}-service-{}".format(self.namespace, service_config['name']),
+                        wg_config['private'],
+                        wg_config['public'],
+                        service_config.get('mtu', 1420),
+                        service_config['address'],
+                        service_config['listen'],
+                        service_config['peer'],
+                        '0.0.0.0/0',
+                        service_config.get('inside', False),
+                        service_config.get('nat', True),
+                        service_config.get('nat', True),
+                    ))
+                else:
+                    logger.error('unknown service type: {}'.format(service_config['type']))
+                    exit(1)
 
         network_config = root_config['config']
         self.network_default_enable_ospf = network_config.get('ospf', False)

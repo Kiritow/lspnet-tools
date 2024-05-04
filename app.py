@@ -9,7 +9,7 @@ import getopt
 from prettytable import PrettyTable
 from network_configparser import NetworkConfigParser
 from network_configparser import create_new_wireguard_keys
-from common.config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, ParserOptions
+from common.config_types import InterfaceConfig, ConnectorPhantunClientConfig, ConnectorPhantunServerConfig, ServiceWireGuard, ParserOptions
 from common.utils import sudo_call, sudo_call_output
 from common.utils import ensure_netns, ensure_ip_forward, ensure_tempdir, clear_tempdir
 from common.utils import get_eth_ip, get_tempdir_path, get_all_loaded_services
@@ -42,7 +42,7 @@ def config_up(parser: NetworkConfigParser):
 
     task_prefix = "networktools-{}-{}".format(parser.hostname, parser.namespace)
     
-    if parser.enable_local_dummy:
+    if parser.enable_local_network and parser.enable_local_dummy:
         vnetwork = ipaddress.ip_network(parser.local_dummy_interface.address)
         vaddrs = list(vnetwork.hosts())
         local_dummy_snat_address = str(vaddrs[0])
@@ -73,6 +73,25 @@ def config_up(parser: NetworkConfigParser):
     if parser.enable_local_network and parser.local_connect_namespaces:
         for connect_config in parser.local_connect_namespaces:
             create_ns_connect(parser.namespace, connect_config.namespace, connect_config.network)
+
+    # Local services
+    if parser.enable_local_network and parser.local_services:
+        for service_config in parser.local_services:
+            if isinstance(service_config, ServiceWireGuard):
+                create_wg_device(None, service_config.name, service_config.address, service_config.mtu)
+                assign_wg_device(None, service_config.name, service_config.private, service_config.listen, service_config.peer, '', 0, service_config.allowed)
+                up_wg_device(None, service_config.name)
+                if service_config.enable_in_nat:  # external wireguard --> current node --> Connected network
+                    wg_network = str(ipaddress.ip_interface(service_config.address).network)
+                    if parser.enable_local_dummy:
+                        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
+                    elif parser.enable_veth_link:
+                        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", local_dummy_snat_address])
+                    else:
+                        logger.warning("wg_service in-nat enabled but no dummy or local veth link configured")
+
+                if service_config.enable_out_nat:  # Connected network --> current node --> external wireguard
+                    try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-o", service_config.name, "-j", "MASQUERADE"])
 
     # PMTU fix
     sudo_call(["ip", "netns", "exec", parser.namespace, "iptables", "-A", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"])

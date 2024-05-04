@@ -11,23 +11,25 @@ from .utils import logger
 def create_wg_device(namespace, name, address, mtu):
     logger.info('creating wireguard device: {}'.format(name))
     sudo_call(["ip", "link", "add", "dev", name, "type", "wireguard"])
-    sudo_call(["ip", "link", "set", "dev", name, "netns", namespace])
-    sudo_call(["ip", "-n", namespace, "address", "add", "dev", name, address])
-    sudo_call(["ip", "-n", namespace, "link", "set", "dev", name, "mtu", str(mtu)])
+    if namespace:
+        sudo_call(["ip", "link", "set", "dev", name, "netns", namespace])
+    
+    sudo_call(ns_wrap(namespace, ["ip", "address", "add", "dev", name, address]))
+    sudo_call(ns_wrap(namespace, ["ip", "link", "set", "dev", name, "mtu", str(mtu)]))
 
 
 def assign_wg_device(namespace, name, private_key, listen_port, peer, endpoint, keepalive, allowed_ips):
-    config_items = []
+    config_args = []
 
-    temp_filename = '/tmp/{}-{}.conf'.format(namespace, uuid.uuid4())
+    temp_filename = '/tmp/{}.conf'.format(uuid.uuid4())
     with open(temp_filename, 'w') as f:
         f.write(private_key)
 
-    config_items.extend(["private-key", temp_filename])
+    config_args.extend(["private-key", temp_filename])
     if listen_port:
-        config_items.extend(["listen-port", str(listen_port)])
+        config_args.extend(["listen-port", str(listen_port)])
     if peer:
-        config_items.extend(["peer", peer])
+        config_args.extend(["peer", peer])
         if endpoint:
             # DNS resolve first
             parts = endpoint.split(':')
@@ -38,19 +40,18 @@ def assign_wg_device(namespace, name, private_key, listen_port, peer, endpoint, 
                 real_endpoint = ':'.join(parts)
             else:
                 real_endpoint = endpoint
-            config_items.extend(["endpoint", real_endpoint])
+            config_args.extend(["endpoint", real_endpoint])
         if keepalive:
-            config_items.extend(["persistent-keepalive", str(keepalive)])
+            config_args.extend(["persistent-keepalive", str(keepalive)])
         if allowed_ips:
-            config_items.extend(["allowed-ips", allowed_ips])
+            config_args.extend(["allowed-ips", allowed_ips])
 
-    sudo_call(["ip", "netns", "exec", namespace, "wg", "set", name] + config_items)
+    sudo_call(ns_wrap(namespace, ["wg", "set", name] + config_args))
     os.unlink(temp_filename)
 
 
 def up_wg_device(namespace, name):
-    sudo_call(["ip", "-n", namespace, "link", "set", "dev", name, "up"])
-
+    sudo_call(ns_wrap(namespace, ["ip", "link", "set", "dev", name, "up"]))
 
 
 def create_veth_device(namespace, name, veth_network):
@@ -75,6 +76,7 @@ def create_veth_device(namespace, name, veth_network):
 def create_dummy_device(name, address, mtu):
     sudo_call(["ip", "link", "add", name, "type", "dummy"])
     sudo_call(["ip", "address", "add", "dev", name, address])
+    sudo_call(["ip", "link", "set", "dev", name, "mtu", str(mtu)])
     sudo_call(["ip", "link", "set", "dev", name, "up"])
 
 

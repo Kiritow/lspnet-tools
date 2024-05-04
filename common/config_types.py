@@ -122,3 +122,19 @@ class ParserOptions:
     save_cache: bool = False
     skip_error_validate: bool = False
     skip_bird: bool = False
+
+
+@dataclass
+class ServiceWireGuard:
+    short_name: str = ''
+    name: str = ''
+    private: str = ''
+    public: str = ''
+    mtu: int = 0
+    address: str = ''
+    listen: int = 0
+    peer: str = ''
+    allowed: str = ''
+    inside_namespace: bool = False
+    enable_in_nat: bool = True
+    enable_out_nat: bool = True
