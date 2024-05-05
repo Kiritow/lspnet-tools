@@ -84,9 +84,9 @@ def config_up(parser: NetworkConfigParser):
                 if service_config.enable_in_nat:  # external wireguard --> current node --> Connected network
                     wg_network = str(ipaddress.ip_interface(service_config.address).network)
                     if parser.enable_local_dummy:
-                        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
-                    elif parser.enable_veth_link:
                         try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", local_dummy_snat_address])
+                    elif parser.enable_veth_link:
+                        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "-o", "{}0".format(parser.local_veth_prefix), "-j", "MASQUERADE"])
                     else:
                         logger.warning("wg_service in-nat enabled but no dummy or local veth link configured")
 
@@ -183,6 +183,11 @@ def config_down(parser: NetworkConfigParser):
 
     for interface_name in parser.interfaces:
         destroy_device_if_exists(parser.namespace, interface_name)
+    
+    if parser.enable_local_network and parser.local_services:
+        for service_config in parser.local_services:
+            if isinstance(service_config, ServiceWireGuard):
+                destroy_device_if_exists('', service_config.name)
 
     if parser.enable_local_network and parser.enable_veth_link:
         destroy_device_if_exists('', "{}0".format(parser.local_veth_prefix))

@@ -153,7 +153,7 @@ class NetworkConfigParser:
                     wg_config = load_or_create_keys(self.namespace, "service-{}".format(service_config["name"]))
                     self.local_services.append(ServiceWireGuard(
                         service_config['name'],
-                        "{}-service-{}".format(self.namespace, service_config['name']),
+                        "{}-{}".format(self.namespace, service_config['name']),
                         wg_config['private'],
                         wg_config['public'],
                         service_config.get('mtu', 1420),
