@@ -81,14 +81,16 @@ def config_up(parser: NetworkConfigParser):
                 create_wg_device(None, service_config.name, service_config.address, service_config.mtu)
                 assign_wg_device(None, service_config.name, service_config.private, service_config.listen, service_config.peer, '', 0, service_config.allowed)
                 up_wg_device(None, service_config.name)
+                # Don't forget to smile! -- hoshikawa
                 if service_config.enable_in_nat:  # external wireguard --> current node --> Connected network
                     wg_network = str(ipaddress.ip_interface(service_config.address).network)
-                    if parser.enable_local_dummy:
-                        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", local_dummy_snat_address])
-                    elif parser.enable_veth_link:
-                        try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "-o", "{}0".format(parser.local_veth_prefix), "-j", "MASQUERADE"])
+                    if parser.enable_veth_link:
+                        if parser.enable_local_dummy:
+                            try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", local_dummy_snat_address])
+                        else:
+                            try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-s", wg_network, "!", "-d", "224.0.0.0/4", "-o", "{}0".format(parser.local_veth_prefix), "-j", "SNAT", "--to", get_eth_ip(parser.local_interface.name)])
                     else:
-                        logger.warning("wg_service in-nat enabled but no dummy or local veth link configured")
+                        logger.warning("wg_service in-nat enabled but no local veth link configured")
 
                 if service_config.enable_out_nat:  # Connected network --> current node --> external wireguard
                     try_append_iptables_rule("nat", f"{parser.namespace}-POSTROUTING", ["-o", service_config.name, "-j", "MASQUERADE"])
