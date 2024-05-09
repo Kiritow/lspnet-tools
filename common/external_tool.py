@@ -55,6 +55,23 @@ def start_gost_forwarder(unit_prefix, install_dir, namespace, source_ports, dst_
                bin_path] + call_args)
 
 
+def start_socat_udp_forwarder(unit_prefix, namespace, source_ports, dst_port):
+    port_segs = ports_to_segments(source_ports)
+    for seg in port_segs:
+        begin_port, end_port = seg
+        if end_port != begin_port:
+            real_port = "{}:{}".format(begin_port, end_port)
+        else:
+            real_port = begin_port
+        try_append_iptables_rule("filter", f"{namespace}-INPUT", ["-p", "udp", "--dport", str(real_port), "-j", "ACCEPT"])
+
+    for port in source_ports:
+        if port == dst_port:
+            continue
+        sudo_call(["systemd-run", "--unit", "{}-{}".format(unit_prefix, uuid.uuid4()), "--collect", "--property", "Restart=always",
+                   "socat", "UDP-LISTEN:{},reuseaddr,fork".format(port), "UDP:127.0.0.1:{}".format(dst_port)])
+
+
 def start_nfq_workers(unit_prefix, install_dir, namespace, config_item: NetworkMappingConfig, eth_name):
     bin_path = os.path.join(install_dir, "bin", "nfq-worker")
 

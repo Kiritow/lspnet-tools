@@ -4,7 +4,7 @@ set -euxo pipefail
 mkdir -p local
 
 sudo apt install -y wireguard
-sudo apt install -y python3 python3-pip podman
+sudo apt install -y python3 python3-pip podman socat
 
 sudo pip3 install requests tomli prettytable
 pip3 install requests tomli prettytable
