@@ -3,6 +3,7 @@ import socket
 import ipaddress
 import uuid
 import json
+import time
 
 from .utils import sudo_call, sudo_call_output, ns_wrap, ensure_netns
 from .utils import logger
@@ -80,10 +81,31 @@ def create_dummy_device(name, address, mtu):
     sudo_call(["ip", "link", "set", "dev", name, "up"])
 
 
+def create_gre_device(name, address, mtu, local_ip, remote_ip, ttl=None, key=None, checksum=False, seqnum=False):
+    call_args = ["ip", "link", "add", name, "type", "gre", "local", local_ip, "remote", remote_ip]
+    if ttl:
+        call_args.extend(["ttl", str(int(ttl))])  # PTMU will be enabled if ttl presents
+    if key:
+        call_args.extend(["key", str(int(key))])
+    if checksum:
+        call_args.append("csum")
+    if seqnum:
+        call_args.append("seq")
+
+    sudo_call(call_args)
+    sudo_call(["ip", "address", "add", "dev", name, address])
+    sudo_call(["ip", "link", "set", "dev", name, "mtu", str(mtu)])
+    sudo_call(["ip", "link", "set", "dev", name, "up"])
+
+
 def destroy_device_if_exists(namespace, interface_name):
     result = sudo_call_output(ns_wrap(namespace, ["ip", "-j", "link"]))
-    print(result)
-    result = json.loads(result)
+    try:
+        result = json.loads(result)
+    except Exception:
+        time.sleep(3)
+        result = sudo_call_output(ns_wrap(namespace, ["ip", "-j", "link"]))
+        result = json.loads(result)
 
     for if_config in result:
         if if_config['ifname'] == interface_name:
