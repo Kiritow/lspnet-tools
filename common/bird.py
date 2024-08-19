@@ -52,9 +52,13 @@ protocol ospf v2 wg {
 
 def render_config(template: str, params: Dict[str, Any]):
     content = template
-    for key, value in params.items():
-        content = content.replace('#{}#'.format(key), str(value))
-    return content
+    while True:
+        new_content = content
+        for key, value in params.items():
+            new_content = new_content.replace('#{}#'.format(key), str(value))
+        if new_content == content:
+            return new_content
+        content = new_content
 
 
 def simple_format(content):
