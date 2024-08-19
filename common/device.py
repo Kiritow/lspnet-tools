@@ -193,3 +193,15 @@ def dump_wireguard_state(namespace, device_name):
             }
 
     return interface_state
+
+
+def get_interface_state(namespace, device_name):
+    addr_output = sudo_call_output(ns_wrap(namespace, ["ip", "-j", "addr", "show", "dev", device_name]))
+    addr_output = json.loads(addr_output)[0]
+    
+    interface_state = {
+        "address": "{}/{}".format(addr_output['addr_info'][0]['local'], addr_output['addr_info'][0]['prefixlen']),
+        "mtu": addr_output['mtu'],
+    }
+    
+    return interface_state
