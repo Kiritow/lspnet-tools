@@ -53,17 +53,20 @@ class SecureChannelClient:
         self.shared_secret: bytes = b''
         self.connection_id: int = 0
 
+    def reset(self):
+        self.handshake_private_key = X25519PrivateKey.generate()
+        self.shared_secret = b''
+        self.connection_id = 0
+
     def get_handshake(self):
-        if not self.handshake_private_key:
-            self.handshake_private_key = X25519PrivateKey.generate()
-            self.shared_secret = b''
-            self.connection_id = 0
+        if self.handshake_private_key is None:
+           self.reset()
 
         public_key = self.handshake_private_key.public_key()
         public_key_transmit_bytes = public_key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
         public_key_sign_bytes = self.private_sign_key.sign(public_key_transmit_bytes)
 
-        return public_key_transmit_bytes, public_key_sign_bytes        
+        return public_key_transmit_bytes, public_key_sign_bytes
 
     def complete_handshake(self, peer_public_key_bytes: bytes, peer_public_key_sign_bytes: bytes, connection_id: int):
         if not self.handshake_private_key:
@@ -74,6 +77,9 @@ class SecureChannelClient:
         self.shared_secret = self.handshake_private_key.exchange(peer_public_key)
         self.handshake_private_key = None
         self.connection_id = connection_id
+
+    def ready(self) -> bool:
+        return self.shared_secret != b''
 
     def encrypt(self, plaintext_bytes: bytes):
         if not self.shared_secret:
@@ -86,7 +92,7 @@ class SecureChannelClient:
             salt=hkdf_salt_bytes,
             info=b"SecureChannelv1",
         ).derive(self.shared_secret)
-        
+
         nonce = secrets.token_bytes(12)
         cipher = Cipher(algorithms.AES(aes_key_bytes), modes.GCM(nonce))
         encryptor = cipher.encryptor()
@@ -113,6 +119,6 @@ class SecureChannelClient:
         cipher = Cipher(algorithms.AES(aes_key_bytes), modes.GCM(message.nonce, message.tag))
         decryptor = cipher.decryptor()
         decryptor.authenticate_additional_data(bytes.fromhex(self.peer_sign_key_hash))
-        
+
         plaintext_bytes = decryptor.update(message.ciphertext) + decryptor.finalize()
         return plaintext_bytes
