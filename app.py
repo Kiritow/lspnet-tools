@@ -5,7 +5,7 @@ import os
 import ipaddress
 import uuid
 import time
-import getopt
+import argparse
 from prettytable import PrettyTable
 from network_configparser import NetworkConfigParser
 from network_configparser import create_new_wireguard_keys
@@ -287,44 +287,45 @@ def show_network_status(parser: NetworkConfigParser):
 
 
 if __name__ == "__main__":
-    _opts, args = getopt.getopt(sys.argv[1:], 'hc:', ['config=', 'offline', 'cache', 'save'])
-    opts = {}
-    for k, v in _opts:
-        opts[k] = v
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('-c', '--config', type=str, help='config file path', action='store')
+    arg_parser.add_argument('--offline', help='offline mode', action='store_true')
+    arg_parser.add_argument('--cache', help='use cache', action='store_true')
+    arg_parser.add_argument('--save', help='save cache', action='store_true')
+    arg_parser.add_argument('action', type=str, help='action to perform', action='store')
 
-    conf_file = opts.get('-c') or opts.get('--config') or os.getenv('CONFIG_FILE')
-    if not conf_file and len(args) > 1:
-        print('Warning: no config file found in command line options or env vars. will use legacy mode to read config file.')
-        conf_file, action = args[0], args[1]
-    else:
-        action = args[0]
+    args = arg_parser.parse_args()
+    conf_file = args.config or os.getenv('CONFIG_FILE')
+    if not conf_file:
+        sys.stderr.write('missing config file!\n')
+        exit(1)
 
     parser_opts = ParserOptions()
-    if action == 'status':
+    if args.action == 'status':
         parser_opts.online_mode = False
         parser_opts.skip_error_validate = True
         parser_opts.skip_bird = True
 
-    if '--offline' in opts:
+    if args.offline:
         parser_opts.online_mode = False
-    if '--cache' in opts:
+    if args.cache:
         parser_opts.use_cache = True
-    if '--save' in opts:
+    if args.save:
         parser_opts.save_cache = True
 
     logger.info('using config file: {}'.format(conf_file))
     config_parser = NetworkConfigParser(toml.loads(open(conf_file).read()), parser_opts)
 
-    if action == 'up':
+    if args.action == 'up':
         config_up(config_parser)
-    elif action == 'down':
+    elif args.action == 'down':
         config_down(config_parser)
-    elif action == 'update':
+    elif args.action == 'update':
         config_update(config_parser)
-    elif action == 'import':
+    elif args.action == 'import':
         interface_name = sys.argv[3]
         import_wg_keys(config_parser, interface_name)
-    elif action == 'rotate':
+    elif args.action == 'rotate':
         interface_name = sys.argv[3]
         if interface_name == 'all':
             for interface_name, interface_config in config_parser.interfaces.items():
@@ -333,12 +334,12 @@ if __name__ == "__main__":
         else:
             logger.info('rotating keys for {}...'.format(interface_name))
             create_new_wireguard_keys(config_parser.namespace, interface_name)
-    elif action == 'list':
+    elif args.action == 'list':
         for interface_name, interface_config in config_parser.interfaces.items():
             print("{}\t{}".format(interface_name, interface_config.public))
-    elif action == 'status':
+    elif args.action == 'status':
         show_network_status(config_parser)
-    elif action == 'test':
+    elif args.action == 'test':
         print(config_parser.network_bird_config)
     else:
-        logger.error('unknown action {}'.format(action))
+        logger.error('unknown action {}'.format(args.action))
