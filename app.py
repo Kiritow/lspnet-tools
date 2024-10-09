@@ -172,7 +172,7 @@ def config_down(parser: NetworkConfigParser):
         try:
             sudo_call(["systemctl", "stop", timer_name])
         except Exception:
-            logger.warning('failed to stop {}: {}'.format(service_name, traceback.format_exc()))
+            logger.warning('failed to stop {}: {}'.format(timer_name, traceback.format_exc()))
 
     logger.info('stopping services: {}'.format(','.join(running_services)))
     for service_name in running_services:
