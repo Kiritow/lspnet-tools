@@ -1,49 +1,60 @@
 import sqlite3
 from contextlib import contextmanager
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
+import logging
 
 
-class BaseConfigStore:
-    def __init__(self, filename: str) -> None:
+class BaseSQLiteTransaction:
+    def __init__(self, conn: Optional[sqlite3.Connection] = None, logger: Optional[logging.Logger] = None) -> None:
+        self.conn = conn
+        self.logger = logger
+
+    def commit(self, ignore_inner_commit: bool = False):
+        if self.conn:
+            self.logger.debug("commit") if self.logger else None
+            self.conn.commit()
+        elif not ignore_inner_commit:
+            raise Exception("Cannot commit on inner transaction")
+
+
+class BaseSQLiteDatabase:
+    def __init__(self, filename: str, logger: Optional[logging.Logger] = None) -> None:
         self.conn = sqlite3.connect(filename, autocommit=False)
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
+        self.logger = logger
         self._flag_commit = True
 
-    def __enter__(self):
-        if not self._flag_commit:
-            raise RuntimeError('nested with statement is not allowed')
-
-        self._flag_commit = False
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb): # type: ignore
-        if exc_type is None and exc_val is None and exc_tb is None:
-            self.conn.commit()
-        else:
-            self.conn.rollback()
-        self._flag_commit = True
-    
     @contextmanager
-    def _begin(self):
+    def begin(self):
         if self._flag_commit:
-            # out most with statement
-            with self:
-                yield self
+            self._flag_commit = False
+            self.logger.debug("begin") if self.logger else None
+            try:
+                yield BaseSQLiteTransaction(self.conn, self.logger)
+            finally:
+                self.logger.debug("rollback") if self.logger else None
+                self.conn.rollback()
+                self._flag_commit = True
         else:
-            # inner with statement
-            yield self
+            # inner transaction
+            yield BaseSQLiteTransaction(None, self.logger)
 
-    def query(self, sql: str, params: Sequence[Any]) -> list[sqlite3.Row]:
-        with self._begin():
-            self.cursor.execute(sql, params)
-            return self.cursor.fetchall()
+    def query(self, sql: str, params: Optional[Sequence[Any]] = None) -> list[sqlite3.Row]:
+        with self.begin() as t:
+            self.cursor.execute(sql, params if params else ())
+            result = self.cursor.fetchall()
+            t.commit(True)
+            return result
 
-    def queryone(self, sql: str, params: Sequence[Any]) -> sqlite3.Row | None:
-        with self._begin():
-            self.cursor.execute(sql, params)
-            return self.cursor.fetchone()
+    def queryone(self, sql: str, params: Optional[Sequence[Any]] = None) -> sqlite3.Row | None:
+        with self.begin() as t:
+            self.cursor.execute(sql, params if params else ())
+            result = self.cursor.fetchone()
+            t.commit(True)
+            return result
 
-    def execute(self, sql: str, params: Sequence[Any]) -> None:
-        with self._begin():
-            self.cursor.execute(sql, params)
+    def execute(self, sql: str, params: Optional[Sequence[Any]] = None) -> None:
+        with self.begin() as t:
+            self.cursor.execute(sql, params if params else ())
+            t.commit(True)
