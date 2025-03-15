@@ -8,7 +8,7 @@ import grp
 from typing import Any
 
 
-from .get_logger import get_logger
+from .base_logger import get_logger
 
 
 logger = get_logger('app')
@@ -171,7 +171,7 @@ def ports_to_segments(ports: list[int]):
 
 
 def port_segments_to_expression(segments: list[tuple[int, int]]):
-    output = []
+    output: list[str] = []
     for seg in segments:
         begin_port, end_port = seg
         if end_port != begin_port:

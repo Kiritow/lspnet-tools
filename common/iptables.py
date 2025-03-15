@@ -5,7 +5,7 @@ from .utils import sudo_wrap, sudo_call
 from .utils import logger
 
 
-def try_create_iptables_chain(table_name, chain_name):
+def try_create_iptables_chain(table_name: str, chain_name: str):
     try:
         subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-N", chain_name]), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
     except subprocess.CalledProcessError as e:
@@ -15,7 +15,7 @@ def try_create_iptables_chain(table_name, chain_name):
         logger.info('iptables chain {} exists in {} table, skip creation.'.format(chain_name, table_name))
 
 
-def try_append_iptables_rule(table_name, chain_name, rule_args):
+def try_append_iptables_rule(table_name: str, chain_name: str, rule_args: list[str]):
     try:
         subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-C", chain_name] + rule_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
     except subprocess.CalledProcessError as e:
@@ -26,7 +26,7 @@ def try_append_iptables_rule(table_name, chain_name, rule_args):
         sudo_call(["iptables", "-t", table_name, "-A", chain_name] + rule_args)
 
 
-def try_insert_iptables_rule(table_name, chain_name, rule_args):
+def try_insert_iptables_rule(table_name: str, chain_name: str, rule_args: list[str]):
     try:
         subprocess.run(sudo_wrap(["iptables", "-t", table_name, "-C", chain_name] + rule_args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, encoding='utf-8')
     except subprocess.CalledProcessError as e:
@@ -37,14 +37,14 @@ def try_insert_iptables_rule(table_name, chain_name, rule_args):
         sudo_call(["iptables", "-t", table_name, "-I", chain_name] + rule_args)
 
 
-def try_flush_iptables(table_name, chain_name):
+def try_flush_iptables(table_name: str, chain_name: str):
     try:
         sudo_call(["iptables", "-t", table_name, "-F", chain_name])
     except Exception:
         logger.warning(traceback.format_exc())
 
 
-def ensure_iptables(namespace):
+def ensure_iptables(namespace: str):
     try_create_iptables_chain("nat", f"{namespace}-POSTROUTING")
     try_insert_iptables_rule("nat", "POSTROUTING", ["-j", "{}-POSTROUTING".format(namespace)])
 
@@ -64,7 +64,7 @@ def ensure_iptables(namespace):
     try_insert_iptables_rule("filter", "INPUT", ["-j", "{}-INPUT".format(namespace)])
 
 
-def clear_iptables(namespace):
+def clear_iptables(namespace: str):
     try_flush_iptables("nat", f"{namespace}-POSTROUTING")
     try_flush_iptables("nat", f"{namespace}-PREROUTING")
     try_flush_iptables("raw", f"{namespace}-PREROUTING")
