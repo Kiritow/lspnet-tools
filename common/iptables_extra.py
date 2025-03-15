@@ -1,14 +1,13 @@
-from typing import List
 from .utils import ports_to_segments
 from .iptables import try_append_iptables_rule
 
 
-def try_append_iptables_port_forward_udp(namespace, in_eth, src_port, dst_port):
+def try_append_iptables_port_forward_udp(namespace: str, in_eth: str, src_port: int | str, dst_port: int):
     try_append_iptables_rule("nat", f"{namespace}-PREROUTING", ["-p", "udp", "-i", in_eth, "--dport", str(src_port), "-j", "DNAT", "--to-destination", f"127.0.0.1:{dst_port}"])
     try_append_iptables_rule("filter", f"{namespace}-FORWARD", ["-p", "udp", "--dport", str(src_port), "-j", "ACCEPT"])
 
 
-def try_append_iptables_multiple_port_forward_udp(namespace, in_eth, src_ports: List[int], dst_port):
+def try_append_iptables_multiple_port_forward_udp(namespace: str, in_eth: str, src_ports: list[int], dst_port: int):
     port_segs = ports_to_segments(src_ports)
 
     for seg in port_segs:
