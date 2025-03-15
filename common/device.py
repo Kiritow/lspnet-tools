@@ -204,4 +204,13 @@ def get_interface_state(namespace: str, device_name: str):
     addr_output = sudo_call_output(ns_wrap(namespace, ["ip", "-j", "addr", "show", "dev", device_name]))
     addr_output = json.loads(addr_output)[0]
 
-    return InterfaceState(name=device_name, address=addr_output['addr_info'][0]['local'], mtu=addr_output['mtu'])
+    mtu = int(addr_output['mtu'])
+    v4_cidrs = ["{}/{}".format(info["local"], info["prefixlen"]) for info in addr_output['addr_info'] if info['family'] == 'inet']
+    # v6_cidrs = ["{}/{}".format(info["local"], info["prefixlen"]) for info in addr_output['addr_info'] if info['family'] == 'inet6']
+
+    return InterfaceState(
+        name=device_name,
+        mtu=mtu,
+        address=v4_cidrs[0] if v4_cidrs else "",
+        # address6=v6_cidrs[0] if v6_cidrs else "",
+    )

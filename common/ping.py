@@ -1,13 +1,13 @@
 import time
 import subprocess
 import traceback
-import json
 import ipaddress
 from common.utils import ns_wrap, sudo_wrap
+from common.device import get_interface_state
 
 
 # get direct ping, return -1 if error
-def get_direct_ping_us(network_namespace, target_ip, ping_count=10):
+def get_direct_ping_us(network_namespace: str, target_ip: str, ping_count: int=10):
     try:
         start_time = time.time()
         print('start ping test')
@@ -26,23 +26,25 @@ def get_direct_ping_us(network_namespace, target_ip, ping_count=10):
 
         print('namespce: {} target: {} count: {} ping not found'.format(network_namespace, target_ip, ping_count))
         return -1
-    except Exception:
+    except subprocess.CalledProcessError:
         print(traceback.format_exc())
         print('namespace: {} target: {} count: {} ping unavailable'.format(network_namespace, target_ip, ping_count))
         return -1
 
 
-def get_peer_ip(network_namespace, interface_name):
+def get_peer_ip(network_namespace: str, interface_name: str):
     try:
-        content = subprocess.check_output(sudo_wrap(ns_wrap(network_namespace, ["ip", "-j", "address", "show", "dev", interface_name])))
-        content = json.loads(content)
-        ipnet = ipaddress.ip_interface("{}/{}".format(content[0]['addr_info'][0]['local'], content[0]['addr_info'][0]['prefixlen'])).network
-        first_addr = str(ipnet[1])
-        second_addr = str(ipnet[2])
-        if first_addr == content[0]['addr_info'][0]['local']:
+        interface_state = get_interface_state(network_namespace, interface_name)
+        ipaddr = ipaddress.ip_interface(interface_state.address)
+        assert isinstance(ipaddr, ipaddress.IPv4Interface)
+        ipnet = ipaddr.network
+
+        first_addr = ipnet[1]
+        second_addr = ipnet[2]
+        if first_addr == ipaddr.ip:
             return str(second_addr)
         else:
             return str(first_addr)
-    except Exception:
+    except subprocess.CalledProcessError:
         print(traceback.format_exc())
         return ''
