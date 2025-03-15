@@ -5,43 +5,42 @@ import socket
 import traceback
 import pwd
 import grp
-from typing import List, Tuple
+from typing import Any
+
 
 from .get_logger import get_logger
 
 
 logger = get_logger('app')
 
-
-def sudo_wrap(args):
+def sudo_wrap(args: list[str]):
     if os.geteuid() != 0:
         logger.warning('sudo: {}'.format(args))
         return ["sudo"] + args
     return args
 
 
-def ns_wrap(namespace, args):
+def ns_wrap(namespace: str, args: list[str]):
     if namespace:
         return ["ip", "netns", "exec", namespace] + args
     return args
 
 
-def sudo_call(args):
+def sudo_call(args: list[str]):
     return subprocess.check_call(sudo_wrap(args))
 
 
-def sudo_call_output(args):
+def sudo_call_output(args: list[str]):
     return subprocess.check_output(sudo_wrap(args), encoding='utf-8')
 
 
-def ensure_netns(namespace):
-    result = subprocess.check_output(["ip", "-j", "netns", "list"])
-    print(result)
-    if not result:
+def ensure_netns(namespace: str):
+    raw_data = subprocess.check_output(["ip", "-j", "netns", "list"], encoding='utf-8')
+    if not raw_data:
         logger.warning('[FIX] ip command does not return valid json text, return empty array')
-        result = '[]'
+        raw_data = '[]'
 
-    result = json.loads(result)
+    result: list[dict[str, Any]] = json.loads(raw_data)
     for config in result:
         if config['name'] == namespace:
             return
@@ -49,32 +48,32 @@ def ensure_netns(namespace):
     sudo_call(["ip", "netns", "add", namespace])
 
 
-def get_tempdir_path(namespace):
+def get_tempdir_path(namespace: str):
     return "/tmp/networktools-{}".format(namespace)
 
 
-def ensure_tempdir(namespace):
+def ensure_tempdir(namespace: str):
     sudo_call(["mkdir", "-p", get_tempdir_path(namespace)])
     sudo_call(["mkdir", "-p", "{}/router".format(get_tempdir_path(namespace))])
 
 
-def clear_tempdir(namespace):
+def clear_tempdir(namespace: str):
     sudo_call(["rm", "-rf", get_tempdir_path(namespace)])
 
 
-def ensure_ip_forward(namespace):
+def ensure_ip_forward(namespace: str):
     sudo_call(["sysctl", "-w", "net.ipv4.ip_forward=1"])
     sudo_call(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv4.ip_forward=1"])
 
 
-def get_eth_ip(name):
+def get_eth_ip(name: str):
     result = sudo_call_output(["ip", "-j", "address", "show", "dev", name])
     print(result)
     result = json.loads(result)
     return [addr_info['local'] for addr_info in result[0]['addr_info'] if addr_info['family'] == 'inet'][0]
 
 
-def human_readable_bytes(b):
+def human_readable_bytes(b: int):
     if b < 1024:
         return "{} B".format(b)
     if b < 1024 * 1024:
@@ -85,7 +84,7 @@ def human_readable_bytes(b):
     return "{:.2f} GiB".format(b / 1024 / 1024 / 1024)
 
 
-def human_readable_duration(s):
+def human_readable_duration(s: int | float):
     if s < 60:
         return "{}s".format(s)
     if s < 60 * 60:
@@ -102,7 +101,7 @@ def get_git_version_user():
         gname = grp.getgrgid(gid).gr_name
         return subprocess.check_output(["sudo", "-u", uname, "-g", gname, "git", "rev-parse", "--verify", "HEAD"], encoding='utf-8').strip()
     except Exception:
-        logger.warn(traceback.format_exc())
+        logger.warning(traceback.format_exc())
         return "https://github.com/Kiritow/lspnet-tools"
 
 
@@ -121,7 +120,7 @@ def get_all_loaded_services():
 
 def parse_ports_expression(port_str: str):
     parts = port_str.split(',')
-    all_ports = set()
+    all_ports: set[int] = set()
     for s in parts:
         if '-' in s:
             begin_port, end_port = s.split('-')
@@ -143,9 +142,9 @@ def parse_endpoint_expression(endpoint_str: str):
     return parts[0], real_host, parse_ports_expression(parts[1])
 
 
-def ports_to_segments(ports: List[int]):
+def ports_to_segments(ports: list[int]):
     sorted_ports = sorted(set([int(x) for x in ports]))
-    segs = []
+    segs: list[tuple[int, int]] = []
     
     begin_port = 0
     end_port = 0
@@ -171,7 +170,7 @@ def ports_to_segments(ports: List[int]):
     return segs
 
 
-def port_segments_to_expression(segments: List[Tuple[int, int]]):
+def port_segments_to_expression(segments: list[tuple[int, int]]):
     output = []
     for seg in segments:
         begin_port, end_port = seg
