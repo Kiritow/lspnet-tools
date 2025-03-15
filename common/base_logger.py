@@ -1,4 +1,6 @@
+import sys
 import logging
+from typing import Optional
 
 
 FMT_GRAY = "\x1b[38;20m"
@@ -9,7 +11,7 @@ FMT_RESET = "\x1b[0m"
 
 
 class ColoredFormatter(logging.Formatter):
-    def __init__(self, real_format):
+    def __init__(self, real_format: str):
         self.real_format = real_format
 
         self.format_map = {
@@ -20,17 +22,20 @@ class ColoredFormatter(logging.Formatter):
             logging.CRITICAL: FMT_BOLD_RED + real_format + FMT_RESET
         }
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord):
         log_fmt = self.format_map.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
 
-def get_logger(name=None):
+def get_logger(name: Optional[str]=None):
     logger = logging.getLogger(name)
     if not logger.hasHandlers():
         console_handler = logging.StreamHandler()
-        console_handler.setFormatter(ColoredFormatter("%(asctime)s [%(levelname)s] <%(filename)s:%(lineno)d> %(message)s"))
+        if sys.stdout.isatty():
+            console_handler.setFormatter(ColoredFormatter("%(asctime)s [%(levelname)s] <%(filename)s:%(lineno)d> %(message)s"))
+        else:
+            console_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] <%(filename)s:%(lineno)d> %(message)s"))
         logger.addHandler(console_handler)
         logger.setLevel(logging.INFO)
     return logger
