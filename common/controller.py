@@ -25,7 +25,7 @@ from common.types import WireGuardState
 def sync_settings_exitnode(remote_state: bool, namespace: str, eth_name: str):
     print("Sync exit node settings...")
 
-    local_state = try_check_iptables_rule("nat", "{}-POSTROUTING", ["-o", eth_name, "-j", "MASQUERADE".format(namespace)])
+    local_state = try_check_iptables_rule("nat", "{}-POSTROUTING".format(namespace), ["-o", eth_name, "-j", "MASQUERADE"])
     if local_state and not remote_state:
         print("Removing MASQUERADE rule for exit node")
         try_delete_iptables_rule("nat", "{}-POSTROUTING".format(namespace), ["-o", eth_name, "-j", "MASQUERADE"])
