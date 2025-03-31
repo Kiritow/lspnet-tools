@@ -4,12 +4,13 @@ import math
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
+from typing import Any, cast
 from common.ping import get_direct_ping_us, get_peer_ip
 from common.podman import inspect_podman_router
 from common.bird import simple_format
 
 
-def render_single_hint(hint_tag, ping_data):
+def render_single_hint(hint_tag: dict[str, Any], ping_data: dict[str, int]):
     skip = 0
     if 'skips' in hint_tag:
         skip = hint_tag['skips']
@@ -22,9 +23,9 @@ def render_single_hint(hint_tag, ping_data):
     return True, (skip, [hint_tag["raw"].format(real_cost)])
 
 
-def render_hint_pingcost(content, ping_data):
-    output = []
-    skip = 0
+def render_hint_pingcost(content: str, ping_data: dict[str, int]):
+    output : list[str] = []
+    skip: int = 0
     for line in content.split('\n'):
         if skip:
             skip -= 1
@@ -34,13 +35,15 @@ def render_hint_pingcost(content, ping_data):
         if not line.startswith('#HINT:'):
             continue
 
-        hint_tag = json.loads(line.replace('#HINT: ', ''))
+        hint_tag: dict[str, Any] = json.loads(line.replace('#HINT: ', ''))
         if hint_tag['type'] != 'cost':
             continue
 
         is_valid, hint_data = render_single_hint(hint_tag, ping_data)
         if not is_valid:
             continue
+        
+        hint_data = cast(tuple[int, list[str]], hint_data) # for typechecker
 
         skip, next_lines = hint_data
         output.extend(next_lines)
@@ -59,10 +62,10 @@ if __name__ == "__main__":
         exit(1)
 
     interfaces = INTERFACE_LIST.split(',')
-    ping_data = {}
+    ping_data: dict[str, int] = {}
     ping_data_lock = Lock()
 
-    def process_single_interface(interface_name):
+    def process_single_interface(interface_name: str):
         peer_ip = get_peer_ip(NETWORK_NAMESPACE, interface_name)
         ping_us = get_direct_ping_us(NETWORK_NAMESPACE, peer_ip, ping_count=5)
         if ping_us < 1:
