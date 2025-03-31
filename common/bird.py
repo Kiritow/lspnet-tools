@@ -61,8 +61,8 @@ def render_config(template: str, params: Dict[str, Any]):
         content = new_content
 
 
-def simple_format(content):
-    output = []
+def simple_format(content: str):
+    output: list[str] = []
     level = 0
 
     for line in content.split('\n'):
@@ -79,7 +79,7 @@ def simple_format(content):
     return '\n'.join(output)
 
 
-def get_bird_config(router_id, direct_interface_names, ospf_exclude_import_cidrs, ospf_exclude_export_cidrs, ospf_area_config: Dict[str, Dict[str, CommonOSPFConfig]], bfd_config: Dict[str, BFDConfig], is_dynamic=False):
+def get_bird_config(router_id: str, direct_interface_names: list[str], ospf_exclude_import_cidrs: list[str], ospf_exclude_export_cidrs: list[str], ospf_area_config: Dict[str, Dict[str, CommonOSPFConfig]], bfd_config: Dict[str, BFDConfig], is_dynamic: bool=False):
     current_time_text = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     router_id_text = 'router id {};'.format(router_id) if router_id else ''
@@ -96,9 +96,9 @@ else reject;
 }''' if localnet_no_export_variable_text else 'export all'
 
     # OSPF
-    all_area_texts = []
+    all_area_texts: list[str] = []
     for area_id, area_interface_mapping in ospf_area_config.items():
-        text_parts = []
+        text_parts: list[str] = []
         text_parts.append(f'''area {area_id} {{''')
         for interface_name, ospf_interface_config in area_interface_mapping.items():
             text_parts.append(f'''interface "{interface_name}" {{''')
@@ -123,7 +123,7 @@ algorithm hmac sha512;
     final_area_text = '\n'.join(all_area_texts)
 
     # BFD
-    all_bfd_texts = []
+    all_bfd_texts: list[str] = []
     for interface_name, bfd_interface_config in bfd_config.items():
         text_parts = []
         text_parts.append(f'''interface "{interface_name}" {{''')
