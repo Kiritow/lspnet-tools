@@ -1,4 +1,4 @@
-import best_sqlite3 # type: ignore # side effect import
+import .best_sqlite3 # type: ignore # side effect import
 import sqlite3
 from contextlib import contextmanager
 from typing import Any, Optional, Sequence
