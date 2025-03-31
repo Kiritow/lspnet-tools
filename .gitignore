@@ -1,6 +1,11 @@
-*.toml
-test*.py
-
 __pycache__/
+.mypy_cache/
 local/
 bin/
+tmp/
+
+venv/
+
+*.toml
+*.db
+test*.py
