@@ -6,10 +6,11 @@ mkdir -p local
 sudo apt install -y wireguard
 sudo apt install -y python3 python3-pip python3-venv podman socat
 
+rm -rf venv
 python3 -m venv venv
 source venv/bin/activate
 echo "$(which pip3)"
-pip3 install requests tomli prettytable pydantic
+pip3 install requests tomli prettytable pydantic cryptography pysqlite3-binary
 deactivate
 
 sudo podman build . -t bird-router
