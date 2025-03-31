@@ -1,0 +1,14 @@
+[Unit]
+Description=Network Tools Service for %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=__INSTALL_DIR__
+ExecStart=__INSTALL_DIR__/venv/bin/python3 app.py -d local/%i.db service-up
+ExecStop=__INSTALL_DIR__/venv/bin/python3 app.py -d local/%i.db service-down
+
+[Install]
+WantedBy=multi-user.target
