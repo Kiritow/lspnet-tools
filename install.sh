@@ -4,11 +4,15 @@ set -euxo pipefail
 mkdir -p local
 
 sudo apt install -y wireguard
-sudo apt install -y python3 python3-pip podman socat
+sudo apt install -y python3 python3-pip python3-venv podman socat
 
-sudo pip3 install requests tomli prettytable
-pip3 install requests tomli prettytable
+python3 -m venv venv
+source venv/bin/activate
+echo "$(which pip3)"
+pip3 install requests tomli prettytable pydantic
+deactivate
+
 sudo podman build . -t bird-router
 
-sed s#__INSTALL_DIR__#$PWD#g network-tools@.service.template > /tmp/network-tools@.service
-sudo mv /tmp/network-tools@.service /etc/systemd/system/network-tools@.service
+sed s#__INSTALL_DIR__#$PWD#g network-tools-new.service.template > /tmp/network-tools-new.service
+sudo mv /tmp/network-tools-new.service /etc/systemd/system/network-tools-new.service
