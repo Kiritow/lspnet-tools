@@ -13,10 +13,10 @@ from common.bird import get_bird_config
 from common.config_db import ConfigStore
 from common.config_types import BFDConfig, CommonOSPFConfig
 from common.device import assign_wg_device, create_veth_device, create_wg_device, destroy_device_if_exists, get_interface_state, dump_all_wireguard_state, up_wg_device
-from common.iptables import dump_iptables, try_check_iptables_rule, try_delete_iptables_rule, try_append_iptables_rule, ensure_iptables
+from common.iptables import clear_iptables, dump_iptables, try_check_iptables_rule, try_delete_iptables_rule, try_append_iptables_rule, ensure_iptables
 from common.ping import get_direct_ping_us, get_peer_ip
-from common.podman import inspect_podman_router, shutdown_podman_router, start_podman_router
-from common.utils import ensure_ip_forward, ensure_netns, ensure_tempdir, get_eth_ip, get_tempdir_path, ns_wrap, sudo_call, sudo_wrap
+from common.podman import inspect_podman_router, shutdown_podman_router, start_podman_router_via_systemd
+from common.utils import clear_tempdir, ensure_ip_forward, ensure_netns, ensure_tempdir, get_eth_ip, get_tempdir_path, ns_wrap, sudo_call, sudo_wrap
 from common.node_manager import NodeManager
 from common.models import RemoteConfigNode, RemoteConfigOSPF, RemoteConfigPeerExtraOSPF, RemoteConfigPeers
 from common.types import WireGuardState
@@ -158,13 +158,13 @@ def ensure_router_container(namespace: str) -> str:
             return container_inspect_result['Id']
         
         # otherwise, delete it first
-        shutdown_podman_router(namespace)
+        shutdown_podman_router(namespace, clear_temp=False)
 
     # container does not exist or not running, create it
     print("Creating router container...")
-    start_podman_router(namespace)
+    start_podman_router_via_systemd(namespace)
     print("Router container started")
-    
+
     container_inspect_result = inspect_podman_router(namespace)
     if not container_inspect_result:
         raise RuntimeError("Failed to create router container")
@@ -334,3 +334,28 @@ def do_sync_with_remote(node_manager: NodeManager):
     sync_settings_bird(remote_peers, network_namespace, remote_node_config.vethCIDR, convert_remote_node_ospf_to_common_ospf(remote_node_config.ospf))
     
     print("Sync completed")
+
+
+def do_cleanup_everything(namespace: str):
+    print("Cleaning up...")
+    ensure_netns(namespace)
+    
+    # stop all wireguard devices
+    interface_states = dump_all_wireguard_state(namespace)
+    for interface_name in interface_states:
+        print("Stopping wireguard device {}".format(interface_name))
+        destroy_device_if_exists(namespace, interface_name)
+
+    print("Stopping veth pairs...")
+    destroy_device_if_exists(namespace, "{}-veth1".format(namespace))
+    
+    print("Cleanup iptables...")
+    clear_iptables(namespace)
+    
+    print("Stop containers...")
+    shutdown_podman_router(namespace)
+    
+    print("Clearing temp dir...")
+    clear_tempdir(namespace)
+    
+    print("Cleanup completed")
