@@ -61,6 +61,11 @@ def sync_settings_veth(remote_state: Optional[str], namespace: str, eth_name: st
                     rule_parts = rule.split()
                     rule_parts = rule_parts[2:] # -A <chain> ...
                     try_delete_iptables_rule("filter", "{}-FORWARD".format(namespace), rule.split())
+                if "{}-INPUT".format(namespace) in rule and "#local_veth#" in rule:
+                    print("Removing veth rule: {}".format(rule))
+                    rule_parts = rule.split()
+                    rule_parts = rule_parts[2:]
+                    try_delete_iptables_rule("filter", "{}-INPUT".format(namespace), rule.split())
 
     elif not local_state and remote_state:
         print("Adding veth interface")
@@ -70,6 +75,7 @@ def sync_settings_veth(remote_state: Optional[str], namespace: str, eth_name: st
         snat_ip = get_eth_ip(eth_name)
         try_append_iptables_rule("nat", "{}-POSTROUTING".format(namespace), ["-s", remote_state, "!", "-d", "224.0.0.0/4", "-o", "{}-veth0".format(namespace), "-j", "SNAT", "--to", snat_ip, "-m", "comment", "--comment", "#local_veth#"])
         try_append_iptables_rule("filter", "{}-FORWARD".format(namespace), ["-o", "{}-veth0".format(namespace), "-j", "ACCEPT", "-m", "comment", "--comment", "#local_veth#"])
+        try_append_iptables_rule("filter", "{}-INPUT".format(namespace), ["-p", "ospf", "-j", "ACCEPT", "-m", "comment", "--comment", "#local_veth#"])
 
 
 def try_patch_pmtu(namespace: str):
