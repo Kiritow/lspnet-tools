@@ -16,7 +16,7 @@ def inspect_podman_router(namespace: str):
 
             container_inspect_result = sudo_call_output(["podman", "container", "inspect", container_info['Id']])
             container_inspect_result = json.loads(container_inspect_result)
-            print(container_inspect_result[0])
+            # print(container_inspect_result[0])
             return container_inspect_result[0]
 
 
