@@ -205,15 +205,19 @@ def get_all_pingcost(namespace: str, interface_names: list[str]):
                 ping_data[interface_name] = 500
             else:
                 ping_data[interface_name] = max(1, int(math.ceil(ping_us / 1000)))
-        
-    with ThreadPoolExecutor(max_workers=4) as pool:
+
+    max_workers = min(20, len(interface_names))
+    print("Create ThreadPool with {} threads to calculate ping costs".format(max_workers))
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
         for interface_name in interface_names:
             pool.submit(get_pingcost, interface_name)
-    
+
     return ping_data
 
 
 def sync_settings_bird(remote_peers: list[RemoteConfigPeers], namespace: str, local_veth_cidr: Optional[str] = None, local_ospf_config: Optional[CommonOSPFConfig] = None):
+    print("Sync bird settings...")
+
     local_interface_cidrs = [str(ipaddress.ip_interface(peer.addressCIDR).network) for peer in remote_peers]
     
     bfd_config: dict[str, BFDConfig] = {} # interface_name -> bfd_config
@@ -237,6 +241,7 @@ def sync_settings_bird(remote_peers: list[RemoteConfigPeers], namespace: str, lo
             cost_data[expected_name] = 500 # default cost, if not specified
 
     if todo_pingcost_interfaces:
+        print("Calculating ping costs for interfaces: {}".format(",".join(todo_pingcost_interfaces)))
         pingcost_data = get_all_pingcost(namespace, todo_pingcost_interfaces)
         for interface_name in pingcost_data:
             pingcost = pingcost_data[interface_name]
