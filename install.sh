@@ -14,5 +14,5 @@ deactivate
 
 sudo podman build . -t bird-router
 
-sed s#__INSTALL_DIR__#$PWD#g network-tools-new.service.template > /tmp/network-tools-new.service
-sudo mv /tmp/network-tools-new.service /etc/systemd/system/network-tools-new.service
+sed s#__INSTALL_DIR__#$PWD#g network-tools@.service.template > /tmp/network-tools@.service
+sudo mv /tmp/network-tools@.service /etc/systemd/system/network-tools@.service
