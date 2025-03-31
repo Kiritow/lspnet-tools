@@ -1,4 +1,3 @@
-import common.best_sqlite3 # type: ignore # side effect import
 import sqlite3
 from contextlib import contextmanager
 from typing import Any, Optional, Sequence
@@ -78,8 +77,31 @@ class BaseSQLiteDatabase:
         return self.execute("insert into {}({}) values ({}) on conflict do nothing".format(table_name, ','.join(sql_fields), ','.join(['?'] * len(sql_fields))), sql_values)
 
     def upsert(self, table_name: str, data: dict[str, Any], update_fields: list[str]) -> int:
-        sql_fields = list(data.keys())
-        update_sql_fields = ["{}=?".format(f) for f in update_fields]
+        # UPSERT without constraints only works after SQLite 3.35.0
+        if sqlite3.sqlite_version_info >= (3, 35, 0):
+            sql_fields = list(data.keys())
+            update_sql_fields = ["{}=?".format(f) for f in update_fields]
 
-        sql_values = [data[k] for k in sql_fields] + [data[k] for k in update_fields]
-        return self.execute("insert into {}({}) values ({}) on conflict do update set {}".format(table_name, ','.join(sql_fields), ','.join(['?'] * len(sql_fields)), ','.join(update_sql_fields)), sql_values)
+            sql_values = [data[k] for k in sql_fields] + [data[k] for k in update_fields]
+            return self.execute("insert into {}({}) values ({}) on conflict do update set {}".format(table_name, ','.join(sql_fields), ','.join(['?'] * len(sql_fields)), ','.join(update_sql_fields)), sql_values)    
+
+        # UPSERT only works after SQLite 3.24.0
+        if sqlite3.sqlite_version_info >= (3, 24, 0):
+            self.logger.debug("SQLite version is too old, try to resolve manually...") if self.logger else None
+            try:
+                # try to insert first
+                return self.insert(table_name, data)
+            except sqlite3.IntegrityError as e:
+                err_msg = str(e)
+                if "constraint failed:" not in err_msg:
+                    raise
+                
+                constraint_name = err_msg.split(':')[1].strip()
+
+                sql_fields = list(data.keys())
+                update_sql_fields = ["{}=?".format(f) for f in update_fields]
+                sql_values = [data[k] for k in sql_fields] + [data[k] for k in update_fields]
+                return self.execute("insert into {}({}) values ({}) on conflict ({}) do update set {}".format(table_name, ','.join(sql_fields), ','.join(['?'] * len(sql_fields)), constraint_name, ','.join(update_sql_fields)), sql_values)
+            
+        # SQLite version is too old
+        raise Exception("SQLite version is too old: {}, please upgrade to 3.24.0 or later".format(sqlite3.sqlite_version))

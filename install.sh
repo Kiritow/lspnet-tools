@@ -10,7 +10,7 @@ rm -rf venv
 python3 -m venv venv
 source venv/bin/activate
 echo "$(which pip3)"
-pip3 install requests tomli prettytable pydantic cryptography pysqlite3-binary
+pip3 install requests tomli prettytable pydantic cryptography
 deactivate
 
 sudo podman build . -t bird-router
