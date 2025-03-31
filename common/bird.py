@@ -79,7 +79,7 @@ def simple_format(content: str):
     return '\n'.join(output)
 
 
-def get_bird_config(router_id: str, direct_interface_names: list[str], ospf_exclude_import_cidrs: list[str], ospf_exclude_export_cidrs: list[str], ospf_area_config: Dict[str, Dict[str, CommonOSPFConfig]], bfd_config: Dict[str, BFDConfig], is_dynamic: bool=False):
+def get_bird_config(router_id: str, direct_interface_names: list[str], ospf_exclude_import_cidrs: list[str], ospf_exclude_export_cidrs: list[str], ospf_area_config: Dict[str, Dict[str, CommonOSPFConfig]], bfd_config: Dict[str, BFDConfig]):
     current_time_text = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     router_id_text = 'router id {};'.format(router_id) if router_id else ''

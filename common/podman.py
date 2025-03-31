@@ -5,12 +5,12 @@ from .utils import logger
 
 
 def inspect_podman_router(namespace: str):
-    container_name = "{}-router".format(namespace)
+    expected_container_name = "{}-router".format(namespace)
 
     container_list = sudo_call_output(["podman", "ps", "-a", "--format=json"])
     container_list = json.loads(container_list)
     for container_info in container_list:
-        if container_name in container_info['Names']:
+        if expected_container_name in container_info['Names']:
             logger.info('found container {} with names: {}'.format(container_info['Id'], container_info['Names']))
 
             container_inspect_result = sudo_call_output(["podman", "container", "inspect", container_info['Id']])

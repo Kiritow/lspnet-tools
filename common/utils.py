@@ -66,7 +66,7 @@ def ensure_ip_forward(namespace: str):
     sudo_call(["ip", "netns", "exec", namespace, "sysctl", "-w", "net.ipv4.ip_forward=1"])
 
 
-def get_eth_ip(name: str):
+def get_eth_ip(name: str) -> str:
     result = sudo_call_output(["ip", "-j", "address", "show", "dev", name])
     print(result)
     result = json.loads(result)

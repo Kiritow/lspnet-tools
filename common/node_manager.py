@@ -7,6 +7,7 @@ import secrets
 import getpass
 import json
 import os
+import subprocess
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -81,11 +82,38 @@ class NodeManager:
 
         return r.json()
 
+    def init_keystore(self, expect_number: int = 10):
+        local_keys = self.db.get_all_wg_keys()
+        if len(local_keys) >= expect_number:
+            print("{} keys found in local keystore".format(len(local_keys)))
+            return
+        
+        print("No keys found in local keystore, generating new keys...")
+        for _ in range(expect_number - len(local_keys)):
+            new_wg_private = subprocess.check_output(["wg", "genkey"], encoding='utf-8').strip()
+            new_wg_pubic = subprocess.check_output(["wg", "pubkey"], encoding='utf-8', input=new_wg_private).strip()
+            self.db.create_wg_key(new_wg_private, new_wg_pubic)
+            print("Generated new key: {}".format(new_wg_pubic))
+
+    def sync_keystore(self):
+        local_keys = self.db.get_all_wg_keys()
+        if not local_keys:
+            print("No keys found in local keystore")
+            return
+        
+        wg_public_keys = [keypair[1] for keypair in local_keys]
+        return self.do_post("/api/v1/node/sync_wireguard_keys", {
+            "keys": wg_public_keys,
+        })
+
     def get_info(self):
         return self.do_get("/api/v1/node/info")
 
     def get_peers(self):
         return self.do_get("/api/v1/node/peers")
+
+    def get_config(self):
+        return self.do_get("/api/v1/node/config")
 
 
 def init_node(store_path: str):
@@ -149,7 +177,15 @@ def get_or_init_node_interactive(store_path: str):
         store = ConfigStore(store_path)
     else:
         store = init_node(store_path)
-    
+        eth_name = input("Ethernet Interface Name: ")
+        assert eth_name, "Ethernet Interface Name cannot be empty"
+        store.set_node_config('ethName', eth_name)
+
+        namespace = input("Network Namespace: ")
+        if not namespace:
+            namespace = "lspnet"
+        store.set_node_config('namespace', namespace)
+
     domain_prefix = store.get_node_config('domainPrefix')
     if not domain_prefix:
         print("node initialized, but not joined to cluster")
