@@ -5,20 +5,23 @@ import math
 import socket
 import subprocess
 from threading import Lock
+import time
 import traceback
 import ipaddress
-from typing import Optional
+from typing import Any, Optional, cast
 import uuid
+
 from common.bird import get_bird_config
 from common.config_db import ConfigStore
 from common.config_types import BFDConfig, CommonOSPFConfig
 from common.device import assign_wg_device, create_veth_device, create_wg_device, destroy_device_if_exists, get_interface_state, dump_all_wireguard_state, up_wg_device
+from common.external_tool import start_gost_forwarder
 from common.iptables import clear_iptables, dump_iptables, try_check_iptables_rule, try_delete_iptables_rule, try_append_iptables_rule, ensure_iptables
 from common.ping import get_direct_ping_us, get_peer_ip
 from common.podman import inspect_podman_router, shutdown_podman_router, start_podman_router_via_systemd
-from common.utils import clear_tempdir, ensure_ip_forward, ensure_netns, ensure_tempdir, get_eth_ip, get_tempdir_path, ns_wrap, sudo_call, sudo_wrap
+from common.utils import clear_tempdir, ensure_ip_forward, ensure_netns, ensure_tempdir, get_all_loaded_services, get_eth_ip, get_tempdir_path, ns_wrap, sudo_call, sudo_wrap, get_install_dir
 from common.node_manager import NodeManager
-from common.models import RemoteConfigNode, RemoteConfigOSPF, RemoteConfigPeerExtraOSPF, RemoteConfigPeers
+from common.models import LocalGostWorkerStore, RemoteConfigNode, RemoteConfigOSPF, RemoteConfigPeerExtraOSPF, RemoteConfigPeers
 from common.types import WireGuardState
 
 
@@ -93,17 +96,189 @@ def try_patch_pmtu(namespace: str):
     sudo_call(["ip", "netns", "exec", namespace, "iptables", "-A", "FORWARD", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"])
 
 
-def resolve_endpoint(endpoint: str):
+def resolve_endpoint(endpoint: str) -> tuple[str, int]:
+    if not endpoint:
+        return "", 0
+
     parts = endpoint.split(':')
-    real_endpoint = socket.gethostbyname(parts[0])
-    if real_endpoint != parts[0]:
-        print('endpoint {} resolve to {}'.format(parts[0], real_endpoint))
-        parts[0] = real_endpoint
-        real_endpoint = ':'.join(parts)
-    else:
-        real_endpoint = endpoint
+    assert len(parts) == 2, "Invalid endpoint format: {}".format(endpoint)
+    raw_host, raw_port = parts
+    port = int(raw_port)
+    raw_ip = socket.gethostbyname(raw_host)
+    if raw_ip != raw_host:
+        print('endpoint {} resolve to {}'.format(raw_host, raw_ip))
+    return raw_ip, port
+
+
+def parse_multiport_from_peer_extra(extra: str) -> Optional[list[int]]:
+    if not extra:
+        return None
+
+    try:
+        jextra = json.loads(extra)
+    except json.JSONDecodeError:
+        print("Failed to parse extra field: {}".format(extra))
+        return None
+
+    if "multiport" not in jextra:
+        print("No multiport config found in extra field")
+        return None
+
+    try:
+        multiport_arr = jextra["multiport"]
+        assert isinstance(multiport_arr, list) and all(isinstance(x, int) for x in multiport_arr), "multiport must be a list of integers" # type: ignore
+        multiport_arr = cast(list[int], multiport_arr)
+        return multiport_arr
+    except Exception as e:
+        print("Failed to parse multiport config: {}".format(e))
+        return None
+
+
+def sync_settings_peer_endpoint(namespace: str, expected_name: str, local_state: WireGuardState, peer: RemoteConfigPeers):
+    local_peer_state = list(local_state.peers.items())[0][1]
+
+    if local_peer_state.keepalive != peer.keepalive:
+        print("Keepalive changed from {} to {}".format(expected_name, local_peer_state.keepalive, peer.keepalive))
+        # peer.keepalive could be 0, which will disables keepalive
+        subprocess.check_call(ns_wrap(namespace, ["wg", "set", expected_name, "peer", peer.peerPublicKey, "persistent-keepalive", str(peer.keepalive)]))
+
+    # Peer could have multiports
+    real_peer_endpoint_ip, real_peer_endpoint_port = resolve_endpoint(peer.endpoint)
+    current_peer_endpoint_ip, current_peer_endpoint_port = resolve_endpoint(local_peer_state.endpoint)
+    multiports = parse_multiport_from_peer_extra(peer.extra)
+
+    # compare ip first
+    if current_peer_endpoint_ip != real_peer_endpoint_ip:
+        print("Updating endpoint from {}:{} to {}:{}".format(current_peer_endpoint_ip, current_peer_endpoint_port, real_peer_endpoint_ip, real_peer_endpoint_port))
+        subprocess.check_call(ns_wrap(namespace, ["wg", "set", expected_name, "peer", peer.peerPublicKey, "endpoint", "{}:{}".format(real_peer_endpoint_ip, real_peer_endpoint_port)]))
+        return
+
+    # ip is same, check ports...
+    if not multiports:
+        # single port, compare and exit
+        if real_peer_endpoint_port and current_peer_endpoint_port != real_peer_endpoint_port:
+            print("Updating endpoint from {}:{} to {}:{}".format(current_peer_endpoint_ip, current_peer_endpoint_port, real_peer_endpoint_ip, real_peer_endpoint_port))
+            subprocess.check_call(ns_wrap(namespace, ["wg", "set", expected_name, "peer", peer.peerPublicKey, "endpoint", "{}:{}".format(real_peer_endpoint_ip, real_peer_endpoint_port)]))
+        return
+
+    real_peer_endpoint_ports = sorted(set([real_peer_endpoint_port] + multiports))
+    if current_peer_endpoint_port not in real_peer_endpoint_ports:
+        # if current endpoint port is not in any or multiports, use the specified one.
+        print("Updating endpoint from {}:{} to {}:{}".format(current_peer_endpoint_ip, current_peer_endpoint_port, real_peer_endpoint_ip, real_peer_endpoint_port))
+        subprocess.check_call(ns_wrap(namespace, ["wg", "set", expected_name, "peer", peer.peerPublicKey, "endpoint", "{}:{}".format(real_peer_endpoint_ip, real_peer_endpoint_port)]))
+        return
+
+    # port is in array. check if we can and need to switch endpoints.
+    if not peer.keepalive: # keepalive already synced at the beginning
+        # no keepalive, no switch endpoint.
+        return
     
-    return real_endpoint
+    if local_peer_state.handshake and (int(time.time()) - local_peer_state.handshake) < 180: # last handshake was 3 minutes ago?
+        print("Last handshake was {} seconds ago.".format(int(peer.keepalive) - local_peer_state.handshake))
+        return
+
+    # switch to next port
+    try:
+        next_port = real_peer_endpoint_ports[real_peer_endpoint_ports.index(current_peer_endpoint_port) + 1]
+    except (IndexError, ValueError):
+        next_port = real_peer_endpoint_ports[0]
+
+    if next_port != current_peer_endpoint_port:
+        print("Updating endpoint from {}:{} to {}:{}".format(current_peer_endpoint_ip, current_peer_endpoint_port, real_peer_endpoint_ip, next_port))
+        subprocess.check_call(ns_wrap(namespace, ["wg", "set", expected_name, "peer", peer.peerPublicKey, "endpoint", "{}:{}".format(real_peer_endpoint_ip, next_port)]))
+        return
+
+
+def parse_multilisten_from_peer_extra(extra: str) -> Optional[list[int]]:
+    if not extra:
+        return None
+
+    try:
+        jextra = json.loads(extra)
+    except json.JSONDecodeError:
+        print("Failed to parse extra field: {}".format(extra))
+        return None
+
+    if "multilisten" not in jextra:
+        print("No multilisten config found in extra field")
+        return None
+
+    try:
+        multilisten_arr = jextra["multilisten"]
+        assert isinstance(multilisten_arr, list) and all(isinstance(x, int) for x in multilisten_arr), "multilisten must be a list of integers" # type: ignore
+        multilisten_arr = cast(list[int], multilisten_arr)
+        return multilisten_arr
+    except Exception as e:
+        print("Failed to parse multilisten config: {}".format(e))
+        return None
+
+
+def sync_settings_peer_listen(store: ConfigStore, namespace: str, expected_name: str, local_state: WireGuardState, peer: RemoteConfigPeers):
+    current_listen_port = local_state.listen
+    remote_multilisten = parse_multilisten_from_peer_extra(peer.extra)
+    # We cannot technically "read" states from processess. so we need to store it "somewhere".
+    store_key = "multilisten-{}".format(expected_name)
+    stored_multilisten = store.get_kv(store_key)
+    stored_multilisten = LocalGostWorkerStore.model_validate_json(stored_multilisten) if stored_multilisten else None
+
+    if current_listen_port != peer.listenPort:
+        print("Updating listen port from {} to {}".format(current_listen_port, peer.listenPort))
+        subprocess.check_call(ns_wrap(namespace, ["wg", "set", expected_name, "listen-port", str(peer.listenPort)]))
+
+    if not stored_multilisten and not remote_multilisten:
+        # no multilisten.
+        return
+
+    if not stored_multilisten and remote_multilisten:
+        # no multilisten locally, got multilisten from remote. setup it
+        print("Adding multilisten ports: {}".format(",".join([str(x) for x in remote_multilisten])))
+        unit_name = "networktools-{}-worker-{}".format(namespace, str(uuid.uuid4()))
+        start_gost_forwarder(unit_name, get_install_dir(), namespace, remote_multilisten, peer.listenPort)
+
+        store_info = LocalGostWorkerStore(unit_name=unit_name, multilisten=sorted(remote_multilisten), dst_port=peer.listenPort)
+        store.set_kv(store_key, store_info.model_dump_json())
+        return
+
+    if stored_multilisten and not remote_multilisten:
+        # multilisten locally, but not remotely. remove it.
+        print("Removing multilisten ports: {}, service: {}".format(",".join([str(x) for x in stored_multilisten.multilisten]), stored_multilisten.unit_name))
+        service_name = stored_multilisten.unit_name + ".service"
+        if service_name in get_all_loaded_services():
+            print("Stopping service: {}".format(service_name))
+            try:
+                sudo_call(["systemctl", "stop", service_name])
+            except subprocess.CalledProcessError as e:
+                print(traceback.format_exc())
+                print("Failed to stop service: {}".format(e))
+        store.delete_kv(store_key)
+        return
+    
+    assert stored_multilisten and remote_multilisten, "unlikely"
+    # compare local stored multilisten and remote multilisten
+    if sorted(stored_multilisten.multilisten) == sorted(remote_multilisten):
+        return
+    
+    # port changed, remove and add the new one
+    print("Updating multilisten ports: {} -> {}".format(",".join([str(x) for x in stored_multilisten.multilisten]), ",".join([str(x) for x in remote_multilisten])))
+    
+    # delete first
+    service_name = stored_multilisten.unit_name + ".service"
+    if service_name in get_all_loaded_services():
+        print("Stopping service: {}".format(service_name))
+        try:
+            sudo_call(["systemctl", "stop", service_name])
+        except subprocess.CalledProcessError as e:
+            print(traceback.format_exc())
+            print("Failed to stop service: {}".format(e))
+    store.delete_kv(store_key)
+
+    # then add the new one
+    new_unit_name = "networktools-{}-worker-{}".format(namespace, str(uuid.uuid4()))
+    start_gost_forwarder(new_unit_name, get_install_dir(), namespace, remote_multilisten, peer.listenPort)
+
+    store_info = LocalGostWorkerStore(unit_name=new_unit_name, multilisten=sorted(remote_multilisten), dst_port=peer.listenPort)
+    store.set_kv(store_key, store_info.model_dump_json())
+    return
 
 
 def sync_settings_peers(store: ConfigStore, remote_peers: list[RemoteConfigPeers], namespace: str):
@@ -114,7 +289,7 @@ def sync_settings_peers(store: ConfigStore, remote_peers: list[RemoteConfigPeers
         local_states = dump_all_wireguard_state(namespace)
     except subprocess.CalledProcessError:
         print(traceback.format_exc())
-    
+
     marked_local_names: list[str] = []
     all_wg_keymap = {x[1]: x[0] for x in store.get_all_wg_keys()} # publicKey -> privateKey
 
@@ -122,13 +297,13 @@ def sync_settings_peers(store: ConfigStore, remote_peers: list[RemoteConfigPeers
         expected_name = "{}-{}".format(namespace, peer.id)
         if expected_name in local_states:
             marked_local_names.append(expected_name)
-            print("Peer {} exists, check endpoint...".format(expected_name))
+            print("Peer {} exists, check states...".format(expected_name))
             if peer.endpoint:
-                real_peer_endpoint = resolve_endpoint(peer.endpoint)
-                current_peer_endpoint = list(local_states[expected_name].peers.items())[0][1].endpoint
-                if current_peer_endpoint != real_peer_endpoint:
-                    print("Updating endpoint from {} to {}".format(current_peer_endpoint, real_peer_endpoint))
-                    subprocess.check_call(ns_wrap(namespace, ["wg", "set", expected_name, "peer", peer.peerPublicKey, "endpoint", real_peer_endpoint]))
+                sync_settings_peer_endpoint(namespace, expected_name, local_states[expected_name], peer)
+
+            if peer.listenPort:
+                sync_settings_peer_listen(store, namespace, expected_name, local_states[expected_name], peer)
+
             continue
 
         print("Peer {} does not exist locally, creating.".format(expected_name))
@@ -300,6 +475,56 @@ def sync_settings_bird(remote_peers: list[RemoteConfigPeers], namespace: str, lo
     print("Bird config reloaded")
 
 
+def get_many_direct_ping_us(namespace: str, interface_names: list[str]):
+    ping_data: dict[str, int] = {}
+    ping_data_lock = Lock()
+
+    def get_ping(interface_name: str):
+        peer_ip = get_peer_ip(namespace, interface_name)
+        ping_us = get_direct_ping_us(namespace, peer_ip, ping_count=5)
+        with ping_data_lock:
+            ping_data[interface_name] = ping_us
+    
+    max_workers = min(20, len(interface_names))
+    print("Create ThreadPool with {} threads to collect ping data".format(max_workers))
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        for interface_name in interface_names:
+            pool.submit(get_ping, interface_name)
+    
+    return ping_data
+
+
+def telemetry_report_stat(node_manager: NodeManager, remote_peers: list[RemoteConfigPeers], namespace: str):
+    print("Sending Telemetry...")
+
+    local_states: dict[str, WireGuardState] = {}
+    try:
+        local_states = dump_all_wireguard_state(namespace)
+    except subprocess.CalledProcessError:
+        print(traceback.format_exc())
+    
+    link_map: dict[str, int] = {}
+    for peer in remote_peers:
+        expected_name = "{}-{}".format(namespace, peer.id)
+        if expected_name in local_states:
+            link_map[expected_name] = peer.id
+    
+    ping_data = get_many_direct_ping_us(namespace, sorted(link_map.keys()))
+    report_data: list[dict[str, Any]] = []
+    for interface_name in link_map:
+        peer_state = list(local_states[interface_name].peers.values())[0]
+        rx, tx = peer_state.rx, peer_state.tx
+        report_data.append({
+            "id": link_map[interface_name],
+            "ping": ping_data[interface_name],
+            "rx": rx,
+            "tx": tx,
+        })
+
+    # send to telemetry server
+    node_manager.send_link_telemetry(report_data)
+
+
 def convert_remote_node_ospf_to_common_ospf(remote_config_ospf: Optional[RemoteConfigOSPF]) -> Optional[CommonOSPFConfig]:
     if not remote_config_ospf:
         return None
@@ -343,6 +568,8 @@ def do_sync_with_remote(node_manager: NodeManager):
     
     sync_settings_peers(store, remote_peers, network_namespace)
     sync_settings_bird(remote_peers, network_namespace, remote_node_config.vethCIDR, convert_remote_node_ospf_to_common_ospf(remote_node_config.ospf))
+
+    telemetry_report_stat(node_manager, remote_peers, network_namespace)
     
     print("Sync completed")
 

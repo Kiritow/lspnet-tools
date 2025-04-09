@@ -42,3 +42,9 @@ class RemoteConfigPeerExtraOSPF(BaseModel):
     ping: bool
     offset: int
     auth: Optional[str] = None
+
+
+class LocalGostWorkerStore(BaseModel):
+    unit_name: str
+    multilisten: list[int]
+    dst_port: int

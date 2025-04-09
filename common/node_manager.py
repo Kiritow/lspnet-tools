@@ -114,6 +114,11 @@ class NodeManager:
 
     def get_config(self):
         return self.do_get("/api/v1/node/config")
+    
+    def send_link_telemetry(self, data: list[dict[str, Any]]):
+        return self.do_post("/api/v1/node/link_telemetry", {
+            "links": data,
+        })
 
 
 def init_node(store_path: str):
