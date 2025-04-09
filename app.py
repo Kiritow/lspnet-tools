@@ -8,7 +8,7 @@ import argparse
 from prettytable import PrettyTable
 from common.config_db import ConfigStore
 from common.node_manager import NodeManager, get_or_init_node_interactive
-from common.utils import sudo_call
+from common.utils import get_install_dir, sudo_call
 from common.utils import get_all_loaded_services
 from common.utils import human_readable_bytes, human_readable_duration
 from common.device import dump_all_wireguard_state
@@ -16,8 +16,7 @@ from common.utils import logger
 from common.controller import do_cleanup_everything, do_sync_with_remote
 
 
-INSTALL_DIR = os.path.dirname(os.path.realpath(sys.argv[0]))
-logger.info('detected INSTALL_DIR={}'.format(INSTALL_DIR))
+INSTALL_DIR = get_install_dir()
 
 
 def show_network_status(namespace: str):

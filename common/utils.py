@@ -2,6 +2,7 @@ import os
 import subprocess
 import json
 import socket
+import sys
 import traceback
 import pwd
 import grp
@@ -46,6 +47,12 @@ def ensure_netns(namespace: str):
             return
     logger.info('creating network namespace: {}'.format(namespace))
     sudo_call(["ip", "netns", "add", namespace])
+
+
+def get_install_dir():
+    install_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+    logger.info('detected INSTALL_DIR={}'.format(install_dir))
+    return install_dir
 
 
 def get_tempdir_path(namespace: str):
