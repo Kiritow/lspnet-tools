@@ -138,7 +138,7 @@ def sync_settings_peer_endpoint(namespace: str, expected_name: str, local_state:
     local_peer_state = list(local_state.peers.items())[0][1]
 
     if local_peer_state.keepalive != peer.keepalive:
-        print("Keepalive changed from {} to {}".format(expected_name, local_peer_state.keepalive, peer.keepalive))
+        print("Keepalive for {} changed from {} to {}".format(expected_name, local_peer_state.keepalive, peer.keepalive))
         # peer.keepalive could be 0, which will disables keepalive
         subprocess.check_call(ns_wrap(namespace, ["wg", "set", expected_name, "peer", peer.peerPublicKey, "persistent-keepalive", str(peer.keepalive)]))
 
