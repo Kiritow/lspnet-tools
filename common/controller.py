@@ -525,7 +525,12 @@ def telemetry_report_stat(node_manager: NodeManager, remote_peers: list[RemoteCo
     # send to telemetry server
     node_manager.send_link_telemetry(report_data)
 
-    area_routers, other_asbrs = get_router_ospf_state(namespace)
+    container_inspect_result = inspect_podman_router(namespace)
+    if not container_inspect_result:
+        print("Router container not found, skipping OSPF telemetry")
+        return
+
+    area_routers, other_asbrs = get_router_ospf_state(container_inspect_result['Id'])
     # send to telemetry server
     node_manager.send_router_telemetry(area_routers, other_asbrs)
 
