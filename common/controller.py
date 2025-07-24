@@ -12,6 +12,7 @@ from typing import Any, Optional, cast
 import uuid
 
 from common.bird import get_bird_config
+from common.bird_ospf_parser import get_router_ospf_state
 from common.config_db import ConfigStore
 from common.config_types import BFDConfig, CommonOSPFConfig
 from common.device import assign_wg_device, create_veth_device, create_wg_device, destroy_device_if_exists, get_interface_state, dump_all_wireguard_state, up_wg_device
@@ -523,6 +524,10 @@ def telemetry_report_stat(node_manager: NodeManager, remote_peers: list[RemoteCo
 
     # send to telemetry server
     node_manager.send_link_telemetry(report_data)
+
+    area_routers, other_asbrs = get_router_ospf_state(namespace)
+    # send to telemetry server
+    node_manager.send_router_telemetry(area_routers, other_asbrs)
 
 
 def convert_remote_node_ospf_to_common_ospf(remote_config_ospf: Optional[RemoteConfigOSPF]) -> Optional[CommonOSPFConfig]:

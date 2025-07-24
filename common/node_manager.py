@@ -10,7 +10,8 @@ import os
 import subprocess
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
+from dataclasses import asdict
+from .bird_ospf_parser import RouterInfo
 from .config_db import ConfigStore
 
 
@@ -118,6 +119,15 @@ class NodeManager:
     def send_link_telemetry(self, data: list[dict[str, Any]]):
         return self.do_post("/api/v1/node/link_telemetry", {
             "links": data,
+        })
+
+    def send_router_telemetry(self, area_routers: dict[str, list[RouterInfo]], other_asbrs: list[RouterInfo]):
+        area_routers_data = {area_id: [asdict(router) for router in routers] for area_id, routers in area_routers.items()}
+        other_asbrs_data = [asdict(router) for router in other_asbrs]
+
+        return self.do_post("/api/v1/node/router_telemetry", {
+            "area_routers": area_routers_data,
+            "other_asbrs": other_asbrs_data,
         })
 
 
