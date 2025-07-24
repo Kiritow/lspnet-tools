@@ -51,7 +51,6 @@ class PeekableLines:
             blevel = get_blevel(line)
             self.index += 1
 
-            print("PeekableLines.pop: {} (blevel={})".format(sline, blevel))
             return line, sline, blevel
         return None
     
@@ -61,7 +60,6 @@ class PeekableLines:
             sline = line.strip()
             blevel = get_blevel(line)
 
-            print("PeekableLines.peek: {} (blevel={})".format(sline, blevel))
             return line, sline, blevel
         return None
 
