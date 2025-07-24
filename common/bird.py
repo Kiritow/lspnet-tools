@@ -50,7 +50,7 @@ protocol ospf v2 wg {
 '''
 
 
-def render_config(template: str, params: Dict[str, Any]):
+def render_config(template: str, params: Dict[str, Any]) -> str:
     content = template
     while True:
         new_content = content
