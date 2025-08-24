@@ -54,6 +54,24 @@ def start_gost_forwarder(unit_name: str, install_dir: str, namespace: str, sourc
                bin_path] + call_args)
 
 
+# gost v3
+# wg ---> gost(listen_port/udp) ---> dst_host:dst_port(tls/tcp, remote gost server)
+def start_gost_tls_relay_client(unit_name: str, install_dir: str, listen_port: int, dst_host: str, dst_prot: int, udp_ttl: int):
+    bin_path = os.path.join(install_dir, "bin", "gost")
+
+    sudo_call(["systemd-run", "--unit", unit_name, "--collect", "--property", "Restart=always",
+               bin_path, "-L=udp://:{}?keepAlive=true&ttl={}s".format(listen_port, udp_ttl),
+               "-F=relay+tls://{}:{}".format(dst_host, dst_prot)])
+
+# gost v3
+# ---> gost(listen_port/tcp) --> wg(target_port/udp)
+def start_gost_tls_relay_server(unit_name: str, install_dir: str, listen_port: int, target_port: int):
+    bin_path = os.path.join(install_dir, "bin", "gost")
+
+    sudo_call(["systemd-run", "--unit", unit_name, "--collect", "--property", "Restart=always",
+               bin_path, "-L=relay+tls://:{}/127.0.0.1:{}".format(listen_port, target_port)])
+
+
 def start_socat_udp_forwarder(unit_prefix: str, namespace: str, source_ports: list[int], dst_port: int):
     port_segs = ports_to_segments(source_ports)
     for seg in port_segs:
