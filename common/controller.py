@@ -77,7 +77,7 @@ def sync_settings_veth(remote_state: Optional[str], namespace: str, eth_name: st
         try_append_iptables_rule("nat", "{}-POSTROUTING".format(namespace), ["-s", remote_state, "-d", remote_state, "-o", "{}-veth0".format(namespace), "-j", "ACCEPT", "-m", "comment", "--comment", "#local_veth#"])
         # TODO: dummy interface SNAT
         snat_ip = get_eth_ip(eth_name)
-        try_append_iptables_rule("nat", "{}-POSTROUTING".format(namespace), ["-s", remote_state, "!", "-d", "224.0.0.0/4", "-o", "{}-veth0".format(namespace), "-j", "SNAT", "--to", snat_ip, "-m", "comment", "--comment", "#local_veth#"])
+        try_append_iptables_rule("nat", "{}-POSTROUTING".format(namespace), ["!", "-d", "224.0.0.0/4", "-o", "{}-veth0".format(namespace), "-j", "SNAT", "--to", snat_ip, "-m", "comment", "--comment", "#local_veth#"])
         try_append_iptables_rule("filter", "{}-FORWARD".format(namespace), ["-o", "{}-veth0".format(namespace), "-j", "ACCEPT", "-m", "comment", "--comment", "#local_veth#"])
         try_append_iptables_rule("filter", "{}-INPUT".format(namespace), ["-p", "ospf", "-j", "ACCEPT", "-m", "comment", "--comment", "#local_veth#"])
 
