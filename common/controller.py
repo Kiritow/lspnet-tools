@@ -101,6 +101,13 @@ def resolve_endpoint(endpoint: str) -> tuple[str, int]:
     if not endpoint:
         return "", 0
 
+    if endpoint.startswith('['):
+        # [ipv6]:port
+        raw_ipv6, _, rest = endpoint[1:].partition(']')
+        raw_port = int(rest[1:])
+        return raw_ipv6, raw_port
+
+    # ipv4:port or hostname:port
     parts = endpoint.split(':')
     assert len(parts) == 2, "Invalid endpoint format: {}".format(endpoint)
     raw_host, raw_port = parts

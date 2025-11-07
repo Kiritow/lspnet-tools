@@ -60,6 +60,9 @@ def ensure_iptables(namespace: str):
     try_create_iptables_chain("raw", f"{namespace}-PREROUTING")
     try_insert_iptables_rule("raw", "PREROUTING", ["-j", "{}-PREROUTING".format(namespace)])
 
+    try_create_iptables_chain("mangle", f"{namespace}-OUTPUT")
+    try_insert_iptables_rule("mangle", "OUTPUT", ["-j", "{}-OUTPUT".format(namespace)])
+
     try_create_iptables_chain("mangle", f"{namespace}-POSTROUTING")
     try_insert_iptables_rule("mangle", "POSTROUTING", ["-j", "{}-POSTROUTING".format(namespace)])
 
